@@ -1,51 +1,89 @@
-# Quilt Pattern Generator - Project Context
+# Appliqué Studio
 
-## What This Is
-A single-file HTML app that converts photos into simplified n-color applique patterns for quilting. Built for non-technical quilt guild members who need an easy way to turn iPhone photos into fabric patterns.
+A browser-based tool that converts photos into simplified appliqué quilt patterns using real-world fabric colors.
 
-## User Story
-Buz needed a simple tool for older quilt guild ladies to:
-- Upload a photo
-- Reduce it to 3-12 colors (for fabric selection)
-- See which colors make up what percentage (for fabric purchasing)
-- Download a PDF with the pattern + color guide
+## The Problem
 
-## Why This Exists
-VectorDrop app failed (required Homebrew dependencies, not user-friendly). Needed something zero-install that works in a browser.
+Appliqué quilts require you to greatly simplify and abstract a photo down to shapes that can reasonably be cut from fabric. Fine details like grass, hair, or cloth texture aren't practical to reproduce. You need to reduce an image to a small number of solid-color regions, where each region maps to a specific purchasable fabric.
 
-## Technical Implementation
-- **Single HTML file** (`quilt-pattern-generator.html`) - no build process, no dependencies except CDN jsPDF
-- **K-means clustering** for color quantization (10 iterations)
-- **Two sliders:**
-  - Color count (3-12 colors)
-  - Detail level (50-200, affects pattern resolution before quantization)
-- **Live preview:** Original photo vs. simplified pattern side-by-side
-- **Color swatches:** Shows hex codes + percentage of pattern each color occupies
-- **PDF export:** Pattern image + color shopping list with percentages
+Existing tools either require technical skills (Photoshop, Illustrator), have complex install requirements (Homebrew deps), or don't understand the fabric-first workflow quilters actually need.
 
-## Current State
-Working v1 delivered. File lives in Buz's Downloads folder.
+## The Solution
 
-## If Buz Wants Modifications
-Common requests might be:
-- UI tweaks (colors, layout, button text)
-- Different PDF formatting
-- Add features (grid overlay, stitch count, rotate/crop)
-- Adjust k-means parameters (more iterations, different distance metrics)
-- Export formats (PNG, SVG)
+Upload a photo, pick a fabric line, adjust a few sliders, and get a pattern with a fabric shopping list. That's it.
 
-## File Location
-The HTML file should be on Buz's Mac somewhere (probably Downloads). If modifications are needed, Desktop Claude can edit it in place rather than regenerating the whole thing.
+**Target audience:** Non-technical quilt guild members working from iPhone photos.
 
-## Key Design Decisions
-- **No backend** - everything client-side in browser
-- **Drag-and-drop first** - phone users can tap to upload
-- **Minimal UI** - two sliders, that's it
-- **Posterization approach** - not vectorization (simpler, faster, more predictable for fabric patterns)
-- **Percentage data** - quilters need to know how much fabric to buy, not just colors
+## Current State (v0.1 — Proof of Concept)
+
+Single HTML file with:
+
+- Photo upload (drag-and-drop or tap)
+- K-means color quantization (3-12 colors)
+- Detail level slider
+- Side-by-side original vs. pattern preview
+- Color swatches with hex codes and percentages
+- PDF export with pattern + color shopping list
+
+## Roadmap
+
+### Phase 1 — Foundation (Crop + Modular Architecture + Real Fabrics)
+
+- [ ] Add interactive crop tool as the first step after upload (retain original for re-cropping)
+- [ ] Break monolith HTML into ES modules (image processing, color engine, UI, PDF export)
+- [ ] Add Kona Cotton Solids fabric library (names, hex/RGB values, SKU codes)
+- [ ] Replace RGB Euclidean distance with perceptual color matching (CIELAB Delta-E)
+- [ ] Map quantized colors to nearest Kona fabric match
+- [ ] Show fabric name + swatch in palette (not just hex codes)
+- [ ] Increase color range to 6-20 (typical appliqué quilt range)
+
+### Phase 2 — Intuitive Image Controls
+
+- [ ] Brightness / contrast sliders
+- [ ] "Warmer / Cooler" color temperature slider
+- [ ] "More reds / fewer reds", "More blues / fewer blues" style tint adjusters
+- [ ] Before/after toggle or side-by-side comparison
+- [ ] All labels in plain language (no jargon like "saturation" or "hue shift")
+
+### Phase 3 — Fabric Palette Management
+
+- [ ] Let user set a custom color palette (pick N fabrics from the library)
+- [ ] Lock/unlock individual colors in the palette
+- [ ] Swap a matched fabric for a different one manually
+- [ ] Add Paintbrush Studio Grunge solids as a second fabric line
+- [ ] Fabric line selector dropdown
+
+### Phase 4 — Pattern Refinement
+
+- [ ] Edge smoothing / simplification (reduce jagged region boundaries)
+- [ ] Minimum region size control (eliminate tiny slivers that can't be cut)
+- [ ] Optional grid/ruler overlay for scaling
+- [ ] Rotate before processing
+
+### Phase 5 — Export & Sharing
+
+- [ ] Improved PDF layout with fabric names, SKUs, and yardage estimates
+- [ ] PNG export of pattern only
+- [ ] SVG export (vector paths for each fabric region)
+- [ ] Save/load project state (JSON)
+
+### Future Ideas
+
+- Additional fabric libraries (Moda Bella Solids, FreeSpirit, etc.)
+- Pattern templates / aspect ratio presets (wall hanging, lap quilt, throw)
+- Numbered regions on pattern (like paint-by-numbers, but for fabric)
+- Community palette sharing
+- Side-by-side fabric photo previews (show actual fabric texture)
 
 ## Tech Stack
-- Vanilla JS (no frameworks)
+
+- Vanilla JS (ES modules)
 - Canvas API for image processing
 - jsPDF (CDN) for PDF generation
-- CSS Grid for responsive layout
+- No build step — open `index.html` in a browser
+
+## Getting Started
+
+Served as a static site via Apache vhost at `http://applique-studio.log/`.
+
+Open `http://applique-studio.log/image-convertor.html` in any modern browser.
