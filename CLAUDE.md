@@ -24,6 +24,15 @@ Served as a static site via Apache vhost: `http://applique-studio.log/`
 4. Review fabric matches
 5. Export
 
+## Design Philosophy
+
+This is NOT a general-purpose image editor. It has one workflow and one goal: turn a photo into a pattern to cut fabric. Every feature should be a *limiting* feature that constrains toward that goal. If a feature doesn't help someone cut fabric, it doesn't belong.
+
+- **Dimensions in inches** (not pixels). Metric support later, US first.
+- **No graphics jargon** — no vertices, splines, bezier curves, DPI, resolution in the UI
+- A hidden dev/advanced mode is acceptable for development tooling
+- When in doubt, constrain rather than expose options
+
 ## UI/UX Guidelines
 
 - **Audience is non-technical quilters.** Use plain language everywhere.

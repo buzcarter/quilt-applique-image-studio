@@ -14,6 +14,18 @@ Upload a photo, pick a fabric line, adjust a few sliders, and get a pattern with
 
 **Target audience:** Non-technical quilt guild members working from iPhone photos.
 
+## Design Philosophy
+
+> "We don't want to re-invent Photoshop, Inkscape, Illustrator, GIMP — for one, huge learning curve, for another — we can't, waaaaay out of our league. We should instead look for *limiting* features because unlike those general-purpose apps ours has ONE workflow and one goal: a pattern to cut fabric."
+
+This means:
+
+- **Dimensions in inches**, not pixels. (Metric support later, US first.)
+- **No graphics jargon** in the UI — no vertices, splines, bezier curves, DPI, resolution.
+- **Every feature must answer:** "Does this help someone cut fabric?"
+- When in doubt, **constrain** rather than expose options.
+- A hidden dev/advanced mode is fine for development and power users, but the default experience is quilter-first.
+
 ## Current State (v0.2 — Phase 1 Complete)
 
 - Modular ES module architecture (color-science, image-processing, fabric-matcher, crop-tool, pdf-export)
