@@ -40,9 +40,14 @@ Served as a static site via Apache vhost: `http://applique-studio.log/`
 - Color matching uses perceptual distance (CIELAB Delta-E), not raw RGB Euclidean distance
 - Typical quilt uses 6-20 distinct fabrics
 
+## CSS Conventions
+
+- Use BEM naming convention (`.block__element--modifier`) as we refactor
+- Plan for Light / Dark / High Contrast themes via CSS custom properties
+- Target audience is older — large touch targets, readable font sizes
+
 ## Code Style
 
-- Vanilla JS, ES modules
+- Vanilla JS, ES modules (may adopt TypeScript + bundler as complexity grows)
 - Descriptive variable/function names
-- No TypeScript (keep it simple for now)
 - Comments only where logic is non-obvious

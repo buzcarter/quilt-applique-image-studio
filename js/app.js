@@ -5,9 +5,11 @@ import { CropTool } from './crop-tool.js';
 import { quantizeColors, downscaleForProcessing } from './image-processing.js';
 import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
 import { exportPdf } from './pdf-export.js';
+import { saveSession, loadSession } from './session.js';
 
 // State
 let originalImage = null; // always retained for re-cropping
+let originalDataUrl = null; // retained for session persistence
 let cropTool = null;
 let currentCrop = null;
 let currentPalette = [];
@@ -46,6 +48,47 @@ async function init() {
   setupUpload();
   setupSliders();
   setupButtons();
+  restoreSession();
+}
+
+function restoreSession() {
+  const session = loadSession();
+  if (!session || !session.imageDataUrl) return;
+
+  const img = new Image();
+  img.onload = () => {
+    originalImage = img;
+    originalDataUrl = session.imageDataUrl;
+
+    // Restore slider values
+    if (session.numColors) {
+      colorSlider.value = session.numColors;
+      colorValue.textContent = session.numColors;
+    }
+    if (session.detail) {
+      detailSlider.value = session.detail;
+      detailValue.textContent = session.detail;
+    }
+
+    // Restore crop and skip straight to the pattern view
+    if (session.crop) {
+      currentCrop = session.crop;
+      applyCrop();
+    } else {
+      showCropStep();
+    }
+  };
+  img.src = session.imageDataUrl;
+}
+
+function persistSession() {
+  if (!originalDataUrl) return;
+  saveSession({
+    imageDataUrl: originalDataUrl,
+    crop: currentCrop,
+    numColors: parseInt(colorSlider.value),
+    detail: parseInt(detailSlider.value),
+  });
 }
 
 // --- Upload ---
@@ -80,6 +123,7 @@ function loadImage(file) {
     const img = new Image();
     img.onload = () => {
       originalImage = img;
+      originalDataUrl = e.target.result;
       showCropStep();
     };
     img.src = e.target.result;
@@ -111,6 +155,7 @@ function applyCrop() {
   actionButtons.classList.remove('hidden');
   recropBtn.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
+  persistSession();
   processImage();
 }
 
@@ -122,12 +167,18 @@ function goBackToCrop() {
 function setupSliders() {
   colorSlider.addEventListener('input', (e) => {
     colorValue.textContent = e.target.value;
-    if (originalImage && currentCrop) processImage();
+    if (originalImage && currentCrop) {
+      processImage();
+      persistSession();
+    }
   });
 
   detailSlider.addEventListener('input', (e) => {
     detailValue.textContent = e.target.value;
-    if (originalImage && currentCrop) processImage();
+    if (originalImage && currentCrop) {
+      processImage();
+      persistSession();
+    }
   });
 }
 
@@ -201,23 +252,34 @@ function displayPalette(palette) {
     const swatch = document.createElement('div');
     swatch.className = 'color-swatch';
 
-    const fabricHtml = color.fabric
-      ? `<div class="fabric-name">${color.fabric.name}</div>
-         <div class="fabric-number">${color.fabric.number}</div>
-         <div class="fabric-match-bar">
-           <span class="match-swatch" style="background-color: ${color.hex}" title="Image color"></span>
-           <span class="match-arrow">→</span>
-           <span class="match-swatch" style="background-color: ${color.fabric.hex}" title="Fabric color"></span>
-         </div>`
-      : `<div class="color-hex">${color.hex}</div>`;
+    if (color.fabric) {
+      swatch.innerHTML = `
+        <div class="color-box" style="background-color: ${color.fabric.hex}"></div>
+        <div class="color-info">
+          <div class="fabric-name">${color.fabric.name}</div>
+          <div class="fabric-details">
+            <span class="fabric-number">${color.fabric.number}</span>
+            <span class="fabric-sep">·</span>
+            <span class="color-percent">${color.percentage}%</span>
+          </div>
+          <div class="fabric-match-bar">
+            <span class="match-swatch" style="background-color: ${color.hex}" title="Image color ${color.hex}"></span>
+            <span class="match-arrow">→</span>
+            <span class="match-swatch" style="background-color: ${color.fabric.hex}" title="Kona ${color.fabric.name} ${color.fabric.hex}"></span>
+            <span class="match-delta" title="Color difference (lower = closer match)">Δ${color.fabric.distance}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      swatch.innerHTML = `
+        <div class="color-box" style="background-color: ${color.hex}"></div>
+        <div class="color-info">
+          <div class="color-hex">${color.hex}</div>
+          <div class="color-percent">${color.percentage}%</div>
+        </div>
+      `;
+    }
 
-    swatch.innerHTML = `
-      <div class="color-box" style="background-color: ${color.fabric ? color.fabric.hex : color.hex}"></div>
-      <div class="color-info">
-        ${fabricHtml}
-        <div class="color-percent">${color.percentage}% of pattern</div>
-      </div>
-    `;
     container.appendChild(swatch);
   }
 }
