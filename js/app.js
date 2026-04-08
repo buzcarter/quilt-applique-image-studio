@@ -1,0 +1,240 @@
+/**
+ * Main application: orchestrates crop → process → match → display workflow.
+ */
+import { CropTool } from './crop-tool.js';
+import { quantizeColors, downscaleForProcessing } from './image-processing.js';
+import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
+import { exportPdf } from './pdf-export.js';
+
+// State
+let originalImage = null; // always retained for re-cropping
+let cropTool = null;
+let currentCrop = null;
+let currentPalette = [];
+
+// DOM refs
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const cropSection = document.getElementById('cropSection');
+const cropCanvas = document.getElementById('cropCanvas');
+const resetCropBtn = document.getElementById('resetCropBtn');
+const applyCropBtn = document.getElementById('applyCropBtn');
+const recropBtn = document.getElementById('recropBtn');
+const controls = document.getElementById('controls');
+const canvasContainer = document.getElementById('canvasContainer');
+const originalCanvas = document.getElementById('originalCanvas');
+const patternCanvas = document.getElementById('patternCanvas');
+const paletteSection = document.getElementById('palette');
+const downloadBtn = document.getElementById('downloadBtn');
+const actionButtons = document.getElementById('actionButtons');
+const colorSlider = document.getElementById('colorSlider');
+const colorValue = document.getElementById('colorValue');
+const detailSlider = document.getElementById('detailSlider');
+const detailValue = document.getElementById('detailValue');
+const fabricStatus = document.getElementById('fabricStatus');
+
+// --- Init ---
+async function init() {
+  try {
+    const fabrics = await loadFabricLibrary('kona-colors.json');
+    fabricStatus.textContent = `Loaded ${fabrics.length} Kona Cotton Solids`;
+  } catch (err) {
+    fabricStatus.textContent = 'Could not load fabric library';
+    console.error('Failed to load fabric library:', err);
+  }
+
+  setupUpload();
+  setupSliders();
+  setupButtons();
+}
+
+// --- Upload ---
+function setupUpload() {
+  uploadArea.addEventListener('click', () => fileInput.click());
+
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragging');
+  });
+
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragging');
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragging');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadImage(file);
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) loadImage(file);
+  });
+}
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      showCropStep();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// --- Crop Step ---
+function showCropStep() {
+  uploadArea.classList.add('hidden');
+  cropSection.classList.remove('hidden');
+  controls.classList.add('hidden');
+  canvasContainer.classList.add('hidden');
+  paletteSection.classList.add('hidden');
+  actionButtons.classList.add('hidden');
+
+  if (cropTool) cropTool.destroy();
+  cropTool = new CropTool(cropCanvas, originalImage, (crop) => {
+    currentCrop = crop;
+  });
+  currentCrop = cropTool.getCrop();
+}
+
+function applyCrop() {
+  cropSection.classList.add('hidden');
+  controls.classList.remove('hidden');
+  canvasContainer.classList.remove('hidden');
+  paletteSection.classList.remove('hidden');
+  actionButtons.classList.remove('hidden');
+  recropBtn.classList.remove('hidden');
+  downloadBtn.classList.remove('hidden');
+  processImage();
+}
+
+function goBackToCrop() {
+  showCropStep();
+}
+
+// --- Processing ---
+function setupSliders() {
+  colorSlider.addEventListener('input', (e) => {
+    colorValue.textContent = e.target.value;
+    if (originalImage && currentCrop) processImage();
+  });
+
+  detailSlider.addEventListener('input', (e) => {
+    detailValue.textContent = e.target.value;
+    if (originalImage && currentCrop) processImage();
+  });
+}
+
+function processImage() {
+  if (!originalImage || !currentCrop) return;
+
+  const numColors = parseInt(colorSlider.value);
+  const detail = parseInt(detailSlider.value);
+
+  // Create a cropped source image on a temp canvas
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = currentCrop.w;
+  cropCanvas.height = currentCrop.h;
+  const cropCtx = cropCanvas.getContext('2d');
+  cropCtx.drawImage(
+    originalImage,
+    currentCrop.x, currentCrop.y, currentCrop.w, currentCrop.h,
+    0, 0, currentCrop.w, currentCrop.h
+  );
+
+  // Create an image from the cropped canvas to use as source
+  const croppedImg = { width: currentCrop.w, height: currentCrop.h };
+
+  // Display original (cropped)
+  const maxWidth = 400;
+  const scale = Math.min(maxWidth / currentCrop.w, 1);
+  const displayW = Math.floor(currentCrop.w * scale);
+  const displayH = Math.floor(currentCrop.h * scale);
+
+  originalCanvas.width = displayW;
+  originalCanvas.height = displayH;
+  const origCtx = originalCanvas.getContext('2d');
+  origCtx.drawImage(cropCanvas, 0, 0, displayW, displayH);
+
+  // Downscale for processing
+  const workW = Math.floor(displayW * (detail / 100));
+  const workH = Math.floor(displayH * (detail / 100));
+
+  const workCanvas = document.createElement('canvas');
+  workCanvas.width = workW;
+  workCanvas.height = workH;
+  const workCtx = workCanvas.getContext('2d');
+  workCtx.drawImage(cropCanvas, 0, 0, workW, workH);
+
+  const imageData = workCtx.getImageData(0, 0, workW, workH);
+  const quantized = quantizeColors(imageData, numColors);
+
+  // Draw quantized pattern scaled up
+  const scaledCanvas = document.createElement('canvas');
+  scaledCanvas.width = workW;
+  scaledCanvas.height = workH;
+  scaledCanvas.getContext('2d').putImageData(quantized.imageData, 0, 0);
+
+  patternCanvas.width = displayW;
+  patternCanvas.height = displayH;
+  const patternCtx = patternCanvas.getContext('2d');
+  patternCtx.imageSmoothingEnabled = false;
+  patternCtx.drawImage(scaledCanvas, 0, 0, workW, workH, 0, 0, displayW, displayH);
+
+  // Match to fabrics and display
+  currentPalette = matchPaletteToFabrics(quantized.palette);
+  displayPalette(currentPalette);
+}
+
+function displayPalette(palette) {
+  document.getElementById('paletteCount').textContent = palette.length;
+  const container = document.getElementById('colorSwatches');
+  container.innerHTML = '';
+
+  for (const color of palette) {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+
+    const fabricHtml = color.fabric
+      ? `<div class="fabric-name">${color.fabric.name}</div>
+         <div class="fabric-number">${color.fabric.number}</div>
+         <div class="fabric-match-bar">
+           <span class="match-swatch" style="background-color: ${color.hex}" title="Image color"></span>
+           <span class="match-arrow">→</span>
+           <span class="match-swatch" style="background-color: ${color.fabric.hex}" title="Fabric color"></span>
+         </div>`
+      : `<div class="color-hex">${color.hex}</div>`;
+
+    swatch.innerHTML = `
+      <div class="color-box" style="background-color: ${color.fabric ? color.fabric.hex : color.hex}"></div>
+      <div class="color-info">
+        ${fabricHtml}
+        <div class="color-percent">${color.percentage}% of pattern</div>
+      </div>
+    `;
+    container.appendChild(swatch);
+  }
+}
+
+// --- Buttons ---
+function setupButtons() {
+  resetCropBtn.addEventListener('click', () => {
+    if (cropTool) cropTool.resetCrop();
+  });
+
+  applyCropBtn.addEventListener('click', applyCrop);
+  recropBtn.addEventListener('click', goBackToCrop);
+
+  downloadBtn.addEventListener('click', () => {
+    exportPdf(patternCanvas, currentPalette);
+  });
+}
+
+// --- Go ---
+init();
