@@ -27,6 +27,7 @@ export class CropTool {
 
     // Crop rect in image coordinates (full image initially)
     this.crop = { x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight };
+    this.aspectRatio = null; // null = free, number = w/h ratio (e.g. 1 for square)
 
     this.dragging = null; // which handle/region is being dragged
     this.dragStart = { x: 0, y: 0 };
@@ -229,6 +230,20 @@ export class CropTool {
         break;
     }
 
+    // Enforce aspect ratio constraint
+    if (this.aspectRatio && this.dragging !== 'move') {
+      h = w / this.aspectRatio;
+      // Keep within image bounds
+      if (y + h > imgH) {
+        h = imgH - y;
+        w = h * this.aspectRatio;
+      }
+      if (x + w > imgW) {
+        w = imgW - x;
+        h = w / this.aspectRatio;
+      }
+    }
+
     this.crop = { x, y, w, h };
     this.draw();
   }
@@ -334,9 +349,53 @@ export class CropTool {
     };
   }
 
-  /** Reset crop to full image */
+  /** Reset crop to full image (respects current aspect ratio constraint) */
   resetCrop() {
-    this.crop = { x: 0, y: 0, w: this.image.naturalWidth, h: this.image.naturalHeight };
+    if (this.aspectRatio) {
+      const imgW = this.image.naturalWidth;
+      const imgH = this.image.naturalHeight;
+      // Fit the largest constrained rect inside the image
+      let w = imgW;
+      let h = w / this.aspectRatio;
+      if (h > imgH) {
+        h = imgH;
+        w = h * this.aspectRatio;
+      }
+      this.crop = {
+        x: (imgW - w) / 2,
+        y: (imgH - h) / 2,
+        w, h,
+      };
+    } else {
+      this.crop = { x: 0, y: 0, w: this.image.naturalWidth, h: this.image.naturalHeight };
+    }
+    this.draw();
+    if (this.onCropChange) {
+      this.onCropChange(this.getCrop());
+    }
+  }
+
+  /**
+   * Set aspect ratio constraint.
+   * @param {number|null} ratio - width/height ratio (1 = square), null = free
+   */
+  setAspectRatio(ratio) {
+    this.aspectRatio = ratio;
+    if (ratio) {
+      // Constrain current crop to new ratio (shrink to fit)
+      const currentRatio = this.crop.w / this.crop.h;
+      if (currentRatio > ratio) {
+        // Too wide, reduce width
+        const newW = this.crop.h * ratio;
+        this.crop.x += (this.crop.w - newW) / 2;
+        this.crop.w = newW;
+      } else {
+        // Too tall, reduce height
+        const newH = this.crop.w / ratio;
+        this.crop.y += (this.crop.h - newH) / 2;
+        this.crop.h = newH;
+      }
+    }
     this.draw();
     if (this.onCropChange) {
       this.onCropChange(this.getCrop());

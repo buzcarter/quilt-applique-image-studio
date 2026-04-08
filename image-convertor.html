@@ -23,6 +23,11 @@
         <div id="cropSection" class="crop-section hidden">
             <h3>Crop Your Photo</h3>
             <p class="crop-hint">Drag the handles to select the area you want to turn into a pattern</p>
+            <div class="crop-presets">
+                <label>Shape:</label>
+                <button class="crop-preset-btn active" data-ratio="free">Free</button>
+                <button class="crop-preset-btn" data-ratio="1:1">Square</button>
+            </div>
             <div class="crop-canvas-wrapper">
                 <canvas id="cropCanvas"></canvas>
             </div>
@@ -35,21 +40,32 @@
         <!-- Step 3: Adjust -->
         <div id="controls" class="controls hidden">
             <div class="control-group">
+                <label for="quiltWidth">Quilt Width</label>
+                <div class="slider-container">
+                    <span>10"</span>
+                    <input type="range" id="quiltWidth" min="10" max="80" value="36" step="1">
+                    <span class="value-display" id="quiltWidthValue">36"</span>
+                </div>
+                <div class="control-detail" id="quiltDimensions"></div>
+            </div>
+
+            <div class="control-group">
                 <label for="colorSlider">Number of Fabrics</label>
                 <div class="slider-container">
-                    <span>6</span>
-                    <input type="range" id="colorSlider" min="6" max="20" value="10" step="1">
+                    <span>4</span>
+                    <input type="range" id="colorSlider" min="4" max="30" value="10" step="1">
                     <span class="value-display" id="colorValue">10</span>
                 </div>
             </div>
 
             <div class="control-group">
-                <label for="detailSlider">Pattern Detail</label>
+                <label for="minPieceSize">Smallest Piece</label>
                 <div class="slider-container">
-                    <span>Less</span>
-                    <input type="range" id="detailSlider" min="50" max="200" value="100" step="10">
-                    <span class="value-display" id="detailValue">100</span>
+                    <span>½"</span>
+                    <input type="range" id="minPieceSize" min="0.5" max="14" value="2" step="0.5">
+                    <span class="value-display" id="minPieceSizeValue">2"</span>
                 </div>
+                <div class="control-detail">Smaller pieces = more detail, more cutting. Larger = simpler pattern.</div>
             </div>
         </div>
 

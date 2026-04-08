@@ -16,13 +16,19 @@ Browser-based tool that converts photos into simplified appliqué quilt patterns
 
 Served as a static site via Apache vhost: `http://applique-studio.log/`
 
-## User Workflow
+## Processing Pipeline (Order of Operations)
 
-1. Upload photo
-2. **Crop** (always first — original retained so user can re-crop anytime)
-3. Adjust colors/simplification
-4. Review fabric matches
-5. Export
+1. **CROP** — user selects region (aspect ratio presets: free or 1:1 square). Original always retained for re-crop.
+2. **QUILT SIZE** — user sets width in inches (10"–80"). Height derived from crop aspect ratio.
+3. **COLOR QUANTIZATION** — reduce to N fabric colors (4–30) using k-means in CIELAB space.
+4. **MINIMUM PIECE SIZE** — sets working grid resolution (inches → pixels). Each grid cell = one "minimum piece". This replaces the old abstract "detail" slider. Smaller pieces = more detail and more cutting. Larger = simpler pattern.
+5. **FABRIC MATCHING** — map quantized colors to nearest Kona Cotton Solid via Delta-E.
+6. **DISPLAY** — pattern preview + fabric shopping list.
+
+### Future pipeline steps (not yet implemented):
+7. **REGION MERGING** — connected-component analysis, merge tiny islands into neighbors.
+8. **EDGE SMOOTHING** — contour simplification for organic cuttable shapes.
+9. **SVG OUTPUT** — vector paths per fabric region. This is the real deliverable: smooth curves, not pixels.
 
 ## Design Philosophy
 

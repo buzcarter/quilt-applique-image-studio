@@ -85,6 +85,40 @@ input[type="file"] {
   margin-bottom: 15px;
 }
 
+.crop-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.crop-presets label {
+  display: inline;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 0;
+}
+
+.crop-preset-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: #eee;
+  color: #555;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: auto;
+}
+
+.crop-preset-btn:hover {
+  background: #ddd;
+}
+
+.crop-preset-btn.active {
+  background: #2c5f4f;
+  color: white;
+  border-color: #2c5f4f;
+}
+
 .crop-canvas-wrapper canvas {
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -163,6 +197,12 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 600;
   color: #2c5f4f;
   font-size: 18px;
+}
+
+.control-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #888;
 }
 
 /* Canvas display */

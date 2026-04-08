@@ -1,15 +1,29 @@
 /**
- * Main application: orchestrates crop → process → match → display workflow.
+ * Main application: orchestrates the quilting pipeline.
+ *
+ * Processing pipeline (order of operations):
+ * 1. CROP — user selects region of interest (original always retained for re-crop)
+ * 2. QUILT SIZE — user sets width in inches; height derived from crop aspect ratio
+ * 3. COLOR QUANTIZATION — reduce to N fabric colors using k-means in CIELAB space
+ * 4. MINIMUM PIECE SIZE — sets the working grid resolution (inches → pixels)
+ *    Each grid cell = one "piece". Smaller = more detail, more cutting.
+ * 5. FABRIC MATCHING — map quantized colors to nearest Kona Cotton Solid
+ * 6. DISPLAY — show pattern preview + fabric shopping list
+ *
+ * Future steps (not yet implemented):
+ * - REGION MERGING — connected-component analysis, merge tiny islands
+ * - EDGE SMOOTHING — contour simplification for organic shapes
+ * - SVG OUTPUT — vector paths per fabric region (the real deliverable)
  */
 import { CropTool } from './crop-tool.js';
-import { quantizeColors, downscaleForProcessing } from './image-processing.js';
+import { quantizeColors } from './image-processing.js';
 import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
 
 // State
-let originalImage = null; // always retained for re-cropping
-let originalDataUrl = null; // retained for session persistence
+let originalImage = null;
+let originalDataUrl = null;
 let cropTool = null;
 let currentCrop = null;
 let currentPalette = [];
@@ -31,8 +45,11 @@ const downloadBtn = document.getElementById('downloadBtn');
 const actionButtons = document.getElementById('actionButtons');
 const colorSlider = document.getElementById('colorSlider');
 const colorValue = document.getElementById('colorValue');
-const detailSlider = document.getElementById('detailSlider');
-const detailValue = document.getElementById('detailValue');
+const quiltWidth = document.getElementById('quiltWidth');
+const quiltWidthValue = document.getElementById('quiltWidthValue');
+const quiltDimensions = document.getElementById('quiltDimensions');
+const minPieceSize = document.getElementById('minPieceSize');
+const minPieceSizeValue = document.getElementById('minPieceSizeValue');
 const fabricStatus = document.getElementById('fabricStatus');
 
 // --- Init ---
@@ -46,11 +63,13 @@ async function init() {
   }
 
   setupUpload();
-  setupSliders();
+  setupControls();
+  setupCropPresets();
   setupButtons();
   restoreSession();
 }
 
+// --- Session ---
 function restoreSession() {
   const session = loadSession();
   if (!session || !session.imageDataUrl) return;
@@ -60,17 +79,19 @@ function restoreSession() {
     originalImage = img;
     originalDataUrl = session.imageDataUrl;
 
-    // Restore slider values
     if (session.numColors) {
       colorSlider.value = session.numColors;
       colorValue.textContent = session.numColors;
     }
-    if (session.detail) {
-      detailSlider.value = session.detail;
-      detailValue.textContent = session.detail;
+    if (session.quiltWidth) {
+      quiltWidth.value = session.quiltWidth;
+      quiltWidthValue.textContent = session.quiltWidth + '"';
+    }
+    if (session.minPieceSize) {
+      minPieceSize.value = session.minPieceSize;
+      minPieceSizeValue.textContent = session.minPieceSize + '"';
     }
 
-    // Restore crop and skip straight to the pattern view
     if (session.crop) {
       currentCrop = session.crop;
       applyCrop();
@@ -87,7 +108,8 @@ function persistSession() {
     imageDataUrl: originalDataUrl,
     crop: currentCrop,
     numColors: parseInt(colorSlider.value),
-    detail: parseInt(detailSlider.value),
+    quiltWidth: parseInt(quiltWidth.value),
+    minPieceSize: parseFloat(minPieceSize.value),
   });
 }
 
@@ -140,6 +162,11 @@ function showCropStep() {
   paletteSection.classList.add('hidden');
   actionButtons.classList.add('hidden');
 
+  // Reset preset buttons to "Free"
+  document.querySelectorAll('.crop-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.ratio === 'free');
+  });
+
   if (cropTool) cropTool.destroy();
   cropTool = new CropTool(cropCanvas, originalImage, (crop) => {
     currentCrop = crop;
@@ -155,90 +182,123 @@ function applyCrop() {
   actionButtons.classList.remove('hidden');
   recropBtn.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
+  updateQuiltDimensions();
   persistSession();
   processImage();
 }
 
-function goBackToCrop() {
-  showCropStep();
-}
+// --- Crop Presets ---
+function setupCropPresets() {
+  document.querySelectorAll('.crop-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.crop-preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
 
-// --- Processing ---
-function setupSliders() {
-  colorSlider.addEventListener('input', (e) => {
-    colorValue.textContent = e.target.value;
-    if (originalImage && currentCrop) {
-      processImage();
-      persistSession();
-    }
-  });
-
-  detailSlider.addEventListener('input', (e) => {
-    detailValue.textContent = e.target.value;
-    if (originalImage && currentCrop) {
-      processImage();
-      persistSession();
-    }
+      const ratio = btn.dataset.ratio;
+      if (cropTool) {
+        cropTool.setAspectRatio(ratio === 'free' ? null : 1);
+      }
+    });
   });
 }
 
+// --- Controls ---
+function setupControls() {
+  // Debounce timer for expensive reprocessing
+  let processTimer = null;
+  const debounceProcess = () => {
+    clearTimeout(processTimer);
+    processTimer = setTimeout(() => {
+      if (originalImage && currentCrop) {
+        processImage();
+        persistSession();
+      }
+    }, 150);
+  };
+
+  quiltWidth.addEventListener('input', () => {
+    quiltWidthValue.textContent = quiltWidth.value + '"';
+    updateQuiltDimensions();
+    debounceProcess();
+  });
+
+  colorSlider.addEventListener('input', () => {
+    colorValue.textContent = colorSlider.value;
+    debounceProcess();
+  });
+
+  minPieceSize.addEventListener('input', () => {
+    minPieceSizeValue.textContent = minPieceSize.value + '"';
+    debounceProcess();
+  });
+}
+
+/** Show computed quilt height based on crop ratio and chosen width */
+function updateQuiltDimensions() {
+  if (!currentCrop) return;
+  const widthInches = parseInt(quiltWidth.value);
+  const aspectRatio = currentCrop.h / currentCrop.w;
+  const heightInches = Math.round(widthInches * aspectRatio);
+  quiltDimensions.textContent = `Pattern will be ${widthInches}" × ${heightInches}"`;
+}
+
+// --- Processing Pipeline ---
 function processImage() {
   if (!originalImage || !currentCrop) return;
 
   const numColors = parseInt(colorSlider.value);
-  const detail = parseInt(detailSlider.value);
+  const widthInches = parseInt(quiltWidth.value);
+  const pieceSize = parseFloat(minPieceSize.value);
 
-  // Create a cropped source image on a temp canvas
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = currentCrop.w;
-  cropCanvas.height = currentCrop.h;
-  const cropCtx = cropCanvas.getContext('2d');
-  cropCtx.drawImage(
+  // Step 1: Extract cropped region
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = currentCrop.w;
+  srcCanvas.height = currentCrop.h;
+  const srcCtx = srcCanvas.getContext('2d');
+  srcCtx.drawImage(
     originalImage,
     currentCrop.x, currentCrop.y, currentCrop.w, currentCrop.h,
     0, 0, currentCrop.w, currentCrop.h
   );
 
-  // Create an image from the cropped canvas to use as source
-  const croppedImg = { width: currentCrop.w, height: currentCrop.h };
+  // Step 2: Calculate working resolution from quilt size + minimum piece size
+  // Each pixel in the working grid represents one "minimum piece"
+  const gridW = Math.max(4, Math.round(widthInches / pieceSize));
+  const aspectRatio = currentCrop.h / currentCrop.w;
+  const gridH = Math.max(4, Math.round(gridW * aspectRatio));
 
-  // Display original (cropped)
-  const maxWidth = 400;
-  const scale = Math.min(maxWidth / currentCrop.w, 1);
-  const displayW = Math.floor(currentCrop.w * scale);
-  const displayH = Math.floor(currentCrop.h * scale);
+  // Step 3: Display original (cropped) at screen resolution
+  const maxDisplayWidth = 400;
+  const displayScale = Math.min(maxDisplayWidth / currentCrop.w, 1);
+  const displayW = Math.floor(currentCrop.w * displayScale);
+  const displayH = Math.floor(currentCrop.h * displayScale);
 
   originalCanvas.width = displayW;
   originalCanvas.height = displayH;
-  const origCtx = originalCanvas.getContext('2d');
-  origCtx.drawImage(cropCanvas, 0, 0, displayW, displayH);
+  originalCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, displayW, displayH);
 
-  // Downscale for processing
-  const workW = Math.floor(displayW * (detail / 100));
-  const workH = Math.floor(displayH * (detail / 100));
-
+  // Step 4: Downscale to working grid and quantize
   const workCanvas = document.createElement('canvas');
-  workCanvas.width = workW;
-  workCanvas.height = workH;
-  const workCtx = workCanvas.getContext('2d');
-  workCtx.drawImage(cropCanvas, 0, 0, workW, workH);
+  workCanvas.width = gridW;
+  workCanvas.height = gridH;
+  workCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, gridW, gridH);
 
-  const imageData = workCtx.getImageData(0, 0, workW, workH);
+  const imageData = workCanvas.getContext('2d').getImageData(0, 0, gridW, gridH);
   const quantized = quantizeColors(imageData, numColors);
 
-  // Draw quantized pattern scaled up
-  const scaledCanvas = document.createElement('canvas');
-  scaledCanvas.width = workW;
-  scaledCanvas.height = workH;
-  scaledCanvas.getContext('2d').putImageData(quantized.imageData, 0, 0);
+  // Step 5: Render pattern preview (scale grid up to display size, no smoothing)
+  const gridCanvas = document.createElement('canvas');
+  gridCanvas.width = gridW;
+  gridCanvas.height = gridH;
+  gridCanvas.getContext('2d').putImageData(quantized.imageData, 0, 0);
 
   patternCanvas.width = displayW;
   patternCanvas.height = displayH;
   const patternCtx = patternCanvas.getContext('2d');
   patternCtx.imageSmoothingEnabled = false;
-  patternCtx.drawImage(scaledCanvas, 0, 0, workW, workH, 0, 0, displayW, displayH);
+  patternCtx.drawImage(gridCanvas, 0, 0, gridW, gridH, 0, 0, displayW, displayH);
 
-  // Match to fabrics and display
+  // Step 6: Match to fabrics and display
   currentPalette = matchPaletteToFabrics(quantized.palette);
   displayPalette(currentPalette);
 }
@@ -291,7 +351,7 @@ function setupButtons() {
   });
 
   applyCropBtn.addEventListener('click', applyCrop);
-  recropBtn.addEventListener('click', goBackToCrop);
+  recropBtn.addEventListener('click', () => showCropStep());
 
   downloadBtn.addEventListener('click', () => {
     exportPdf(patternCanvas, currentPalette);

@@ -5,9 +5,9 @@
 
 const STORAGE_KEY = 'applique-studio-session';
 
-export function saveSession({ imageDataUrl, crop, numColors, detail }) {
+export function saveSession({ imageDataUrl, crop, numColors, quiltWidth, minPieceSize }) {
   try {
-    const data = JSON.stringify({ imageDataUrl, crop, numColors, detail });
+    const data = JSON.stringify({ imageDataUrl, crop, numColors, quiltWidth, minPieceSize });
     sessionStorage.setItem(STORAGE_KEY, data);
   } catch (e) {
     // sessionStorage can fail if image is too large (5-10MB limit)
