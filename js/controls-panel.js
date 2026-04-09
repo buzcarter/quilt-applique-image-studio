@@ -68,6 +68,16 @@ export function getControlValues() {
   };
 }
 
+/** Resets all sliders to their HTML default values and refreshes their labels. */
+export function resetControlValues() {
+  for (const id of Object.keys(_SLIDERS)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.value = el.defaultValue;
+    _updateLabel(el);
+  }
+}
+
 /** Restores slider values from a saved session and refreshes their labels. */
 export function restoreControlValues(session) {
   const restore = [

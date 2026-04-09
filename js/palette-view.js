@@ -10,7 +10,7 @@
  */
 import { renderTemplate } from './template-renderer.js';
 
-export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight }) {
+export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight, onChangeFabric }) {
   document.getElementById('paletteCount').textContent = palette.length;
   document.getElementById('pieceCount').textContent = totalPieces;
   document.getElementById('patternPanelFabricCount').textContent = palette.length;
@@ -55,6 +55,15 @@ export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight
       swatch.addEventListener('mouseleave', () => onUnhighlight());
       swatch.addEventListener('focus',      () => onHighlight(color.colorIndex));
       swatch.addEventListener('blur',       () => onUnhighlight());
+    }
+
+    const changeBtn = swatch.querySelector('[data-action="change-fabric"]');
+    if (changeBtn && typeof onChangeFabric === 'function') {
+      changeBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onChangeFabric(color.colorIndex);
+      });
     }
 
     container.appendChild(swatch);

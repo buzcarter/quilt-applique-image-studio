@@ -195,6 +195,10 @@ label {
   outline-offset: 1px;
 }
 
+.slider-step-btn img {
+  vertical-align: middle;
+}
+
 .slider-min,
 .slider-max {
   font-size: 10px;
@@ -281,11 +285,48 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .canvas-wrapper {
+  position: relative;
   text-align: center;
   cursor: pointer;
   border-radius: 6px;
   padding: 8px;
   transition: box-shadow 0.15s;
+}
+
+.canvas-corner-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  padding: 6px;
+  line-height: 0;
+  border-radius: 5px;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+.canvas-corner-btn img {
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.canvas-panel-icon {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.panel-hero .canvas-panel-icon {
+  display: none;
+}
+
+.canvas-corner-btn:hover {
+  opacity: 1;
 }
 
 .panel-sidebar .canvas-wrapper:hover {
@@ -349,9 +390,10 @@ input[type="range"]::-moz-range-thumb {
 
 .paint-mode-option {
   margin: 0;
-  padding: 6px 12px;
+  padding: 6px 10px;
   min-height: 30px;
   border-radius: 999px;
+  line-height: 0;
   font-size: 12px;
   line-height: 1;
   color: #587066;
@@ -361,6 +403,10 @@ input[type="range"]::-moz-range-thumb {
 .paint-mode-toggle input[type="radio"]:checked + .paint-mode-option {
   background: #1f5d4d;
   color: #fff;
+}
+
+.paint-mode-toggle input[type="radio"]:checked + .paint-mode-option img {
+  filter: brightness(0) invert(1);
 }
 
 .paint-color-control,
@@ -390,7 +436,81 @@ input[type="range"]::-moz-range-thumb {
   flex: 0 0 auto;
 }
 
-.paint-color-control select {
+.fabric-select {
+  position: relative;
+}
+
+.fabric-select__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #d0d8d4;
+  border-radius: 4px;
+  padding: 3px 6px 3px 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c5f4f;
+  cursor: pointer;
+  line-height: 1.4;
+  max-width: 180px;
+}
+
+.fabric-select__trigger:hover {
+  background: #f0f7f4;
+}
+
+.fabric-select__value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabric-select__caret {
+  color: #999;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.fabric-select__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #d0d8d4;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  padding: 4px 0;
+  z-index: 100;
+}
+
+.fabric-select__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.fabric-select__option:hover {
+  background: #f0f7f4;
+}
+
+.fabric-select__option[aria-selected="true"] {
+  background: #e8f4ef;
+  font-weight: 600;
+}
+
+/* .paint-color-control select removed — replaced by .fabric-select custom dropdown */
+.paint-color-control-select-unused {
   max-width: 170px;
   border: none;
   background: transparent;
@@ -604,6 +724,161 @@ canvas {
   margin-left: 2px;
 }
 
+.fabric-actions {
+  margin-top: 6px;
+}
+
+.swatch-change-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  min-height: 28px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid #9eb6ac;
+  background: transparent;
+  color: #4e665c;
+}
+
+.swatch-change-btn:hover {
+  background: #edf4f0;
+  border-color: #7fa191;
+  color: #355247;
+}
+
+.swatch-change-btn img {
+  flex-shrink: 0;
+}
+
+.fabric-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.fabric-picker__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 34, 30, 0.52);
+}
+
+.fabric-picker__panel {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(78vh, 700px);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #d9e4df;
+  box-shadow: 0 16px 42px rgba(20, 29, 25, 0.24);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabric-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fabric-picker__header h4 {
+  color: #2c5f4f;
+  font-size: 16px;
+}
+
+.fabric-picker__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  background: #73847d;
+}
+
+.fabric-picker__hint {
+  color: #666;
+  font-size: 13px;
+}
+
+.fabric-picker__search-row {
+  display: flex;
+}
+
+.fabric-picker__search {
+  width: 100%;
+  border: 1px solid #ccd8d2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.fabric-picker__search:focus {
+  outline: 2px solid rgba(44, 95, 79, 0.25);
+  border-color: #7ca496;
+}
+
+.fabric-picker__grid {
+  overflow: auto;
+  border: 1px solid #e4ece8;
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.fabric-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #dce8e2;
+  background: #f8fbf9;
+  color: #2b3f37;
+  font-size: 12px;
+  text-align: left;
+}
+
+.fabric-picker__option:hover {
+  background: #edf4f0;
+  border-color: #aac3b8;
+}
+
+.fabric-picker__option.is-selected {
+  border-color: #2c5f4f;
+  box-shadow: 0 0 0 2px rgba(44, 95, 79, 0.14);
+}
+
+.fabric-picker__chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.fabric-picker__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabric-picker__empty {
+  color: #777;
+  font-size: 13px;
+  padding: 8px;
+}
+
 .color-hex {
   font-weight: 600;
   font-family: monospace;
@@ -655,6 +930,30 @@ button:disabled {
 
 .hidden {
   display: none;
+}
+
+.new-project-area {
+  margin-top: 15px;
+}
+
+#newProjectBtn,
+#downloadBtn {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#newProjectBtn img,
+#downloadBtn img {
+  filter: brightness(0) invert(1);
+  display: block;
+  flex-shrink: 0;
+}
+
+.new-project-area button {
+  display: block;
+  width: 100%;
 }
 
 /* SVG pattern panel */

@@ -101,3 +101,7 @@ This means:
 Served as a static site via Apache vhost at `http://applique-studio.log/`.
 
 Open `http://applique-studio.log/` (or `http://applique-studio.log/index.html`) in any modern browser.
+
+--
+
+[Orchid Line Interface Icons Collection](https://www.svgrepo.com/collection/orchid-line-interface-icons)

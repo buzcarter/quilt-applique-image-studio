@@ -31,22 +31,29 @@ let _eraseBtn = null;
 let _clearBtn = null;
 let _sizeSlider = null;
 let _sizeLabel = null;
-let _colorSelect = null;
-let _colorChip = null;
+let _colorDropdown = null;   // .fabric-select container
+let _colorTrigger = null;    // trigger button
+let _colorList = null;       // <ul> of options
+let _colorValueLabel = null; // selected-name <span> inside trigger
+let _colorChip = null;       // color swatch in trigger
+let _currentColorValue = '';
 
 export function initPaintTool({ onStrokeEnd, onClear }) {
   _onStrokeEnd = onStrokeEnd;
   _onClear = onClear;
 
-  _canvas      = document.getElementById('paintOverlayCanvas');
-  _brushCursor = document.getElementById('brushCursor');
-  _paintBtn    = document.getElementById('paintModeBtn');
-  _eraseBtn    = document.getElementById('eraseModeBtn');
-  _clearBtn    = document.getElementById('clearOverlayBtn');
-  _sizeSlider  = document.getElementById('brushSize');
-  _sizeLabel   = document.getElementById('brushSizeValue');
-  _colorSelect = document.getElementById('paintColorSelect');
-  _colorChip   = document.getElementById('paintColorChip');
+  _canvas          = document.getElementById('paintOverlayCanvas');
+  _brushCursor     = document.getElementById('brushCursor');
+  _paintBtn        = document.getElementById('paintModeBtn');
+  _eraseBtn        = document.getElementById('eraseModeBtn');
+  _clearBtn        = document.getElementById('clearOverlayBtn');
+  _sizeSlider      = document.getElementById('brushSize');
+  _sizeLabel       = document.getElementById('brushSizeValue');
+  _colorDropdown   = document.getElementById('paintColorSelect');
+  _colorTrigger    = _colorDropdown.querySelector('.fabric-select__trigger');
+  _colorList       = _colorDropdown.querySelector('.fabric-select__list');
+  _colorValueLabel = _colorDropdown.querySelector('.fabric-select__value');
+  _colorChip       = document.getElementById('paintColorChip');
 
   _updateSizeLabel();
   _setMode('paint');
@@ -64,10 +71,22 @@ export function initPaintTool({ onStrokeEnd, onClear }) {
     _state.brushSize = parseInt(_sizeSlider.value, 10);
     _updateSizeLabel();
   });
-  _colorSelect.addEventListener('change', (e) => { e.stopPropagation(); _applySelectedColor(); });
+
+  _colorTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opening = _colorList.hidden;
+    _colorList.hidden = !opening;
+    _colorTrigger.setAttribute('aria-expanded', String(opening));
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', () => {
+    _colorList.hidden = true;
+    _colorTrigger.setAttribute('aria-expanded', 'false');
+  });
 
   // Prevent control interactions from bubbling to canvas/document handlers
-  for (const el of [_paintBtn, _eraseBtn, _clearBtn, _sizeSlider, _colorSelect]) {
+  for (const el of [_paintBtn, _eraseBtn, _clearBtn, _sizeSlider, _colorDropdown]) {
     el.addEventListener('pointerdown', (e) => e.stopPropagation());
     el.addEventListener('click', (e) => e.stopPropagation());
   }
@@ -144,23 +163,39 @@ export function syncPaintOverlayCanvas(width, height) {
  * Preserves the previously selected color when possible.
  */
 export function refreshPaintColorOptions(palette) {
-  const previous = _colorSelect.value;
-  _colorSelect.innerHTML = '';
+  const previous = _currentColorValue;
+  _colorList.innerHTML = '';
 
   _paletteOptions = (palette && palette.length > 0)
     ? palette.map((e) => ({ colorIndex: e.colorIndex, overlayHex: e.hex, label: e.fabric?.name || e.hex }))
     : [{ colorIndex: 0, overlayHex: '#2c5f4f', label: 'Default Green' }];
 
   for (const entry of _paletteOptions) {
-    const opt = document.createElement('option');
-    opt.value = String(entry.colorIndex);
-    opt.textContent = entry.label;
-    _colorSelect.appendChild(opt);
+    const li = document.createElement('li');
+    li.className = 'fabric-select__option';
+    li.setAttribute('role', 'option');
+    li.dataset.value = String(entry.colorIndex);
+
+    const chip = document.createElement('span');
+    chip.className = 'paint-color-chip';
+    chip.setAttribute('aria-hidden', 'true');
+    chip.style.backgroundColor = entry.overlayHex;
+
+    const name = document.createElement('span');
+    name.textContent = entry.label;
+
+    li.append(chip, name);
+    li.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _selectColor(String(entry.colorIndex));
+      _colorList.hidden = true;
+      _colorTrigger.setAttribute('aria-expanded', 'false');
+    });
+    _colorList.appendChild(li);
   }
 
   const hasPrev = _paletteOptions.some((e) => String(e.colorIndex) === previous);
-  _colorSelect.value = hasPrev ? previous : String(_paletteOptions[0].colorIndex);
-  _applySelectedColor();
+  _selectColor(hasPrev ? previous : String(_paletteOptions[0].colorIndex));
 }
 
 /**
@@ -243,12 +278,16 @@ function _updateSizeLabel() {
   _sizeLabel.textContent = `${_sizeSlider.value} px`;
 }
 
-function _applySelectedColor() {
-  const found = _paletteOptions.find((e) => String(e.colorIndex) === _colorSelect.value)
-    || _paletteOptions[0];
-  _state.colorIndex = found.colorIndex;
-  _state.colorHex = found.overlayHex;
+function _selectColor(value) {
+  _currentColorValue = value;
+  const found = _paletteOptions.find((e) => String(e.colorIndex) === value) || _paletteOptions[0];
+  _state.colorIndex = found?.colorIndex ?? 0;
+  _state.colorHex = found?.overlayHex ?? '#2c5f4f';
   _colorChip.style.backgroundColor = _state.colorHex;
+  _colorValueLabel.textContent = found?.label ?? '—';
+  for (const li of _colorList.querySelectorAll('.fabric-select__option')) {
+    li.setAttribute('aria-selected', li.dataset.value === value ? 'true' : 'false');
+  }
 }
 
 function _getPoint(event) {

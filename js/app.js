@@ -15,12 +15,12 @@
  */
 import { CropTool } from './crop-tool.js';
 import { quantizeColors, mergeSmallRegions } from './image-processing.js';
-import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
+import { loadFabricLibrary, matchPaletteToFabrics, getFabricLibrary } from './fabric-matcher.js';
 import { generatePatternSVG } from './svg-tracer.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
 import { initUpload } from './upload.js';
-import { initControlsPanel, getControlValues, restoreControlValues, setQuiltDimensionsText } from './controls-panel.js';
+import { initControlsPanel, getControlValues, restoreControlValues, resetControlValues, setQuiltDimensionsText } from './controls-panel.js';
 import {
   initPaintTool,
   clearPaintOverlay,
@@ -32,6 +32,8 @@ import {
 } from './paint-tool.js';
 import { renderPalette } from './palette-view.js';
 import { initPanelLayout } from './panel-layout.js';
+import { rgbToLab, deltaE } from './color-science.js';
+import { initFabricPicker, openFabricPicker } from './fabric-picker.js';
 
 // --- App state ---
 let originalImage = null;
@@ -47,6 +49,8 @@ let pendingPaintOverlayDataUrl = null;
 
 // DOM refs used by the orchestration layer only
 const uploadArea      = document.getElementById('uploadArea');
+const cancelUploadRow = document.getElementById('cancelUploadRow');
+const newProjectArea  = document.getElementById('newProjectArea');
 const cropSection     = document.getElementById('cropSection');
 const cropCanvas      = document.getElementById('cropCanvas');
 const controls        = document.getElementById('controls');
@@ -70,8 +74,15 @@ async function init() {
   }
 
   initUpload((img, dataUrl) => {
+    const isNewProject = !!originalImage;
     originalImage = img;
     originalDataUrl = dataUrl;
+    if (isNewProject) {
+      resetControlValues();
+      clearPaintOverlay();
+      currentSimplifiedResult = null;
+      currentPatternRender = null;
+    }
     showCropStep();
   });
 
@@ -95,6 +106,12 @@ async function init() {
   _setupCropPresets();
   _setupButtons();
   initPanelLayout(canvasContainer);
+  initFabricPicker({
+    getLibrary: () => getFabricLibrary(),
+    onSelect: (colorIndex, fabric) => {
+      _overrideMatchedFabric(colorIndex, fabric);
+    },
+  });
   restoreSession();
 }
 
@@ -137,6 +154,8 @@ function persistSession() {
 // --- Flow ---
 function showCropStep() {
   uploadArea.classList.add('hidden');
+  cancelUploadRow.classList.add('hidden');
+  newProjectArea.classList.add('hidden');
   cropSection.classList.remove('hidden');
   controls.classList.add('hidden');
   canvasContainer.classList.add('hidden');
@@ -163,6 +182,7 @@ function applyCrop() {
   actionButtons.classList.remove('hidden');
   recropBtn.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
+  newProjectArea.classList.remove('hidden');
   _updateQuiltDimensions();
   persistSession();
   processQuantization();
@@ -298,11 +318,20 @@ function processPattern() {
   );
   const backgroundColorIndex = _chooseBackgroundColorIndex(updatedMatchedPalette);
 
+  // Final SVG colors should follow mapped Kona colors (including user overrides),
+  // while geometry still follows the quantized assignment map.
+  const svgPalette = updatedPalette.map((entry) => {
+    const mapped = updatedMatchedPalette.find((candidate) => candidate.colorIndex === entry.colorIndex);
+    return mapped?.fabric?.hex
+      ? { ...entry, hex: mapped.fabric.hex }
+      : entry;
+  });
+
   const svgResult = generatePatternSVG(
     mergedSource.assignments,
     processingW,
     processingH,
-    updatedPalette,
+    svgPalette,
     { backgroundColorIndex, curveComplexity, smoothness }
   );
   currentPatternSvgMarkup = svgResult.svg;
@@ -318,8 +347,45 @@ function processPattern() {
   renderPalette(currentPalette, currentTotalPieces, {
     onHighlight:   (ci) => { renderPatternPreview(ci); _highlightSVGColor(ci); },
     onUnhighlight: ()   => { renderPatternPreview(null); _highlightSVGColor(null); },
+    onChangeFabric: (ci) => {
+      const entry = currentPalette.find((item) => item.colorIndex === ci);
+      if (!entry) return;
+      openFabricPicker({
+        colorIndex: ci,
+        currentFabric: entry.fabric,
+        sourceLabel: entry.fabric?.name || entry.hex,
+      });
+    },
   });
   refreshPaintColorOptions(currentSimplifiedResult.matchedPalette || currentPalette);
+}
+
+function _overrideMatchedFabric(colorIndex, fabric) {
+  if (!currentSimplifiedResult?.matchedPalette || !fabric) return;
+
+  const sourceEntry = currentSimplifiedResult.palette.find((entry) => entry.colorIndex === colorIndex);
+  if (!sourceEntry?.lab) return;
+
+  const targetLab = rgbToLab(fabric.rgb.r, fabric.rgb.g, fabric.rgb.b);
+  const distance = deltaE(sourceEntry.lab, targetLab).toFixed(1);
+
+  currentSimplifiedResult.matchedPalette = currentSimplifiedResult.matchedPalette.map((entry) => (
+    entry.colorIndex === colorIndex
+      ? {
+          ...entry,
+          fabric: {
+            name: fabric.name,
+            number: fabric.number,
+            hex: fabric.hex,
+            rgb: fabric.rgb,
+            distance,
+          },
+        }
+      : entry
+  ));
+
+  processPattern();
+  persistSession();
 }
 
 // --- Preview / highlight ---
@@ -403,7 +469,19 @@ function _highlightSVGColor(activeColorIndex) {
 function _setupButtons() {
   document.getElementById('resetCropBtn').addEventListener('click', () => cropTool?.resetCrop());
   document.getElementById('applyCropBtn').addEventListener('click', applyCrop);
-  recropBtn.addEventListener('click', () => showCropStep());
+  recropBtn.addEventListener('click', (e) => { e.stopPropagation(); showCropStep(); });
+
+  document.getElementById('newProjectBtn').addEventListener('click', () => {
+    newProjectArea.classList.add('hidden');
+    cancelUploadRow.classList.remove('hidden');
+    uploadArea.classList.remove('hidden');
+  });
+
+  document.getElementById('cancelUploadBtn').addEventListener('click', () => {
+    uploadArea.classList.add('hidden');
+    cancelUploadRow.classList.add('hidden');
+    newProjectArea.classList.remove('hidden');
+  });
   downloadBtn.addEventListener('click', () => {
     const { quiltWidth } = getControlValues();
     const quiltHeightInches = currentCrop
