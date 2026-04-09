@@ -1,9 +1,10 @@
 /**
  * SVG contour tracer for quilting patterns.
  * Converts pixel-based color assignments into smooth SVG paths
- * using marching squares, RDP simplification, and Catmull-Rom smoothing.
+ * using marching squares contour tracing and Schneider bezier curve fitting.
  */
 import { config } from './config.js';
+import { presmoothContour, polygonArea, detectCorners, fitContourPath } from './bezier-fit.js';
 
 /**
  * Generate SVG markup from quantized color assignments.
@@ -11,7 +12,7 @@ import { config } from './config.js';
  * @param {number} width - processing grid width
  * @param {number} height - processing grid height
  * @param {Array} palette - color entries with .hex, .colorIndex
- * @param {number|object|null} options - backgroundColorIndex or export options
+ * @param {number|object|null} options - backgroundColorIndex or options object
  * @returns {{ svg: string, pieceCounts: Map<number, number>, totalPieces: number }}
  */
 export function generatePatternSVG(assignments, width, height, palette, options = null) {
@@ -23,12 +24,15 @@ export function generatePatternSVG(assignments, width, height, palette, options 
     curveComplexity = 55,
     smoothness = 60,
   } = resolvedOptions;
+
+  const cornerThreshold = _getCornerThreshold(curveComplexity);
+  const fitTolerance = _getFitTolerance(smoothness);
+  const minArea = config.svg.min_area;
+
   const allPaths = [];
   const pieceCounts = new Map();
-  const _pathLog = [];
-  const backgroundEntry = palette.find((color) => color.colorIndex === backgroundColorIndex) || null;
+  const backgroundEntry = palette.find(c => c.colorIndex === backgroundColorIndex) || null;
   const backgroundFill = backgroundEntry ? backgroundEntry.hex : '#fff';
-  const simplifyTolerance = getSimplifyTolerance(curveComplexity);
 
   for (const color of palette) {
     if (color.colorIndex === backgroundColorIndex) {
@@ -38,19 +42,20 @@ export function generatePatternSVG(assignments, width, height, palette, options 
 
     const contours = traceColorBoundary(assignments, width, height, color.colorIndex);
     let count = 0;
+
     for (const contour of contours) {
       if (contour.length < 4) continue;
-      const simplified = simplifyClosedPath(contour, simplifyTolerance);
-      if (simplified.length < 3) continue;
-      const perimeterPx = _polylineLength(simplified);
-      if (perimeterPx <= config.svg.min_perimiter_length) continue;
-      _pathLog.push({ index: allPaths.length, color: color.hex, pts: simplified.length, perimeter: perimeterPx });
+
+      const area = Math.abs(polygonArea(contour));
+      if (area < minArea) continue;
+
+      const smoothed = presmoothContour(contour);
+      const corners = detectCorners(smoothed, cornerThreshold);
+      const pathD = fitContourPath(smoothed, corners, fitTolerance);
+      if (!pathD) continue;
+
       count++;
-      allPaths.push({
-        d: smoothToSVGPath(simplified, smoothness),
-        fill: color.hex,
-        colorIndex: color.colorIndex,
-      });
+      allPaths.push({ d: pathD, fill: color.hex, colorIndex: color.colorIndex });
     }
     pieceCounts.set(color.colorIndex, count);
   }
@@ -59,30 +64,36 @@ export function generatePatternSVG(assignments, width, height, palette, options 
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 ${width} ${height}" class="pattern-svg">`,
     `<rect x="-0.5" y="-0.5" width="${width}" height="${height}" fill="${backgroundFill}"/>`,
   ];
-
   for (const p of allPaths) {
     lines.push(
       `<path d="${p.d}" fill="${p.fill}" data-color-index="${p.colorIndex}"/>`
     );
   }
-
   lines.push('</svg>');
-
-  _pathLog.sort((a, b) => a.perimeter - b.perimeter);
-  for (const e of _pathLog) {
-    console.log(`path[${e.index}]  color=${e.color}  pts=${e.pts}  perimeter=${e.perimeter.toFixed(1)}px`);
-  }
 
   return { svg: lines.join('\n'), pieceCounts, totalPieces: allPaths.length };
 }
 
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
+// --- Slider Mappings ---
+
+function _clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+/**
+ * Map complexity slider (0–100) to corner detection angle threshold (radians).
+ * Low complexity → high threshold → fewer corners → simpler shapes.
+ */
+function _getCornerThreshold(curveComplexity) {
+  const t = _clamp01(Number(curveComplexity || 0) / 100);
+  return 0.2 + (1 - t) ** 1.5 * 1.6;
 }
 
-function getSimplifyTolerance(curveComplexity) {
-  const t = clamp01(Number(curveComplexity || 0) / 100);
-  return 0.35 + ((1 - t) ** 2) * 3.15;
+/**
+ * Map smoothness slider (0–100) to bezier fitting tolerance (pixels).
+ * High smoothness → high tolerance → smoother curves.
+ */
+function _getFitTolerance(smoothness) {
+  const t = _clamp01(Number(smoothness || 0) / 100);
+  return 0.5 + t ** 1.3 * 7.5;
 }
 
 // --- Marching Squares Contour Tracing ---
@@ -178,161 +189,4 @@ function traceColorBoundary(assignments, w, h, target) {
   }
 
   return paths;
-}
-
-// --- Ramer-Douglas-Peucker Simplification ---
-
-function simplifyClosedPath(pts, tol) {
-  if (pts.length <= 4) return pts;
-
-  // Split closed path at the point farthest from pts[0]
-  let maxD = 0, splitIdx = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i][0] - pts[0][0], dy = pts[i][1] - pts[0][1];
-    const d = dx * dx + dy * dy;
-    if (d > maxD) { maxD = d; splitIdx = i; }
-  }
-
-  const a = rdp(pts.slice(0, splitIdx + 1), tol);
-  const b = rdp(pts.slice(splitIdx).concat([pts[0]]), tol);
-  return a.concat(b.slice(1, -1));
-}
-
-function rdp(pts, tol) {
-  if (pts.length <= 2) return pts;
-
-  const [ax, ay] = pts[0];
-  const [bx, by] = pts[pts.length - 1];
-  let maxD = 0, maxI = 0;
-
-  for (let i = 1; i < pts.length - 1; i++) {
-    const d = ptLineDist(pts[i], ax, ay, bx, by);
-    if (d > maxD) { maxD = d; maxI = i; }
-  }
-
-  if (maxD > tol) {
-    const left = rdp(pts.slice(0, maxI + 1), tol);
-    const right = rdp(pts.slice(maxI), tol);
-    return left.concat(right.slice(1));
-  }
-  return [pts[0], pts[pts.length - 1]];
-}
-
-function ptLineDist([px, py], ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
-
-// --- Path Smoothing (Taubin λ|μ + Catmull-Rom) ---
-
-/**
- * One Laplacian relaxation pass. Each vertex moves factor × (neighbor avg − itself).
- * Positive factor: shrinks toward centroid. Negative: expands slightly.
- */
-function laplacianPass(pts, factor) {
-  const n = pts.length;
-  return pts.map((p, i) => {
-    const prev = pts[(i - 1 + n) % n];
-    const next = pts[(i + 1) % n];
-    return [
-      p[0] + factor * ((prev[0] + next[0]) / 2 - p[0]),
-      p[1] + factor * ((prev[1] + next[1]) / 2 - p[1]),
-    ];
-  });
-}
-
-/**
- * Taubin λ|μ smoothing: alternates a shrinking pass (λ) and a slight
- * expanding pass (μ) so the shape rounds without contracting to a point.
- * After enough iterations a convex polygon converges to a circle.
- */
-function taubinSmooth(pts, iterations) {
-  const LAMBDA = 0.5;
-  const MU = -0.53; // |μ| > λ to resist shrinkage
-  let current = pts;
-  for (let i = 0; i < iterations; i++) {
-    current = laplacianPass(current, LAMBDA);
-    current = laplacianPass(current, MU);
-  }
-  return current;
-}
-
-/**
- * Convert a point array to a closed straight-line polygon SVG path.
- * Used as the t≈0 fallback.
- */
-function polygonToSVGPath(pts) {
-  const f = (v) => +v.toFixed(2);
-  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
-  for (let i = 1; i < pts.length; i++) {
-    d += `L${f(pts[i][0])} ${f(pts[i][1])}`;
-  }
-  return d + 'Z';
-}
-
-/**
- * Convert points to a smooth closed SVG path.
- *
- * smoothness 0:   straight polygon, no changes.
- * smoothness 50:  moderate Taubin rounding + visible bezier softening.
- * smoothness 100: high Taubin rounding + strong Catmull-Rom tension.
- *                 A square becomes circle-like.
- */
-function smoothToSVGPath(pts, smoothness = 60) {
-  const n = pts.length;
-  if (n < 3) return '';
-
-  const t = clamp01(Number(smoothness || 0) / 100);
-  if (t <= 0.01) {
-    return polygonToSVGPath(pts);
-  }
-
-  // Stronger slider response: ease lightly so mid-range is still noticeable.
-  const eased = t ** 1.2;
-
-  // Taubin iterations: larger cap gives materially stronger high-end rounding.
-  const iterations = Math.round(eased * 60);
-  const smoothed = iterations > 0 ? taubinSmooth(pts, iterations) : pts;
-
-  // Catmull-Rom tension: broaden range so smoothness visibly affects curvature.
-  const tension = 0.02 + eased * 0.28;
-
-  const f = (v) => +v.toFixed(2);
-  const m = smoothed.length;
-  let d = `M${f(smoothed[0][0])} ${f(smoothed[0][1])}`;
-
-  for (let i = 0; i < m; i++) {
-    const p0 = smoothed[(i - 1 + m) % m];
-    const p1 = smoothed[i];
-    const p2 = smoothed[(i + 1) % m];
-    const p3 = smoothed[(i + 2) % m];
-
-    const cp1x = p1[0] + (p2[0] - p0[0]) * tension;
-    const cp1y = p1[1] + (p2[1] - p0[1]) * tension;
-    const cp2x = p2[0] - (p3[0] - p1[0]) * tension;
-    const cp2y = p2[1] - (p3[1] - p1[1]) * tension;
-
-    d += `C${f(cp1x)} ${f(cp1y)},${f(cp2x)} ${f(cp2y)},${f(p2[0])} ${f(p2[1])}`;
-  }
-
-  return d + 'Z';
-}
-
-// --- Diagnostics ---
-
-/**
- * Straight-line perimeter of a closed polygon (treats all segments as linear).
- * Fast approximation suitable for size filtering; no curve math needed.
- */
-function _polylineLength(pts) {
-  let len = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i];
-    const b = pts[(i + 1) % pts.length];
-    len += Math.hypot(b[0] - a[0], b[1] - a[1]);
-  }
-  return len;
 }
