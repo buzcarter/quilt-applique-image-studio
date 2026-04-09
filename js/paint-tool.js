@@ -86,6 +86,35 @@ export function clearPaintOverlay() {
   _canvas.getContext('2d').clearRect(0, 0, _canvas.width, _canvas.height);
 }
 
+/** Returns current paint overlay as PNG data URL, or null when unavailable. */
+export function getPaintOverlayDataUrl() {
+  if (!_canvas || _canvas.width <= 0 || _canvas.height <= 0) return null;
+  return _canvas.toDataURL('image/png');
+}
+
+/**
+ * Restores paint overlay from a PNG data URL.
+ * Draws into the current overlay canvas size and returns true on success.
+ */
+export function restorePaintOverlayFromDataUrl(dataUrl) {
+  return new Promise((resolve) => {
+    if (!_canvas || !dataUrl || _canvas.width <= 0 || _canvas.height <= 0) {
+      resolve(false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const ctx = _canvas.getContext('2d');
+      ctx.clearRect(0, 0, _canvas.width, _canvas.height);
+      ctx.drawImage(img, 0, 0, _canvas.width, _canvas.height);
+      resolve(true);
+    };
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
+}
+
 /**
  * Resizes the overlay canvas to match a new display size, scaling any
  * existing paint content to fit. No-op if dimensions are unchanged.

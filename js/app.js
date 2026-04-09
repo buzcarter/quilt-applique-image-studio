@@ -21,7 +21,15 @@ import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
 import { initUpload } from './upload.js';
 import { initControlsPanel, getControlValues, restoreControlValues, setQuiltDimensionsText } from './controls-panel.js';
-import { initPaintTool, clearPaintOverlay, syncPaintOverlayCanvas, refreshPaintColorOptions, getMergedAssignments } from './paint-tool.js';
+import {
+  initPaintTool,
+  clearPaintOverlay,
+  syncPaintOverlayCanvas,
+  refreshPaintColorOptions,
+  getMergedAssignments,
+  getPaintOverlayDataUrl,
+  restorePaintOverlayFromDataUrl,
+} from './paint-tool.js';
 import { renderPalette } from './palette-view.js';
 import { initPanelLayout } from './panel-layout.js';
 
@@ -35,6 +43,7 @@ let currentTotalPieces = 0;
 let currentPatternRender = null;
 let currentPatternSvgMarkup = '';
 let currentSimplifiedResult = null; // cached quantization; only cleared by crop/size/color changes
+let pendingPaintOverlayDataUrl = null;
 
 // DOM refs used by the orchestration layer only
 const uploadArea      = document.getElementById('uploadArea');
@@ -73,8 +82,14 @@ async function init() {
   });
 
   initPaintTool({
-    onStrokeEnd: () => { if (currentSimplifiedResult) processPattern(); },
-    onClear:     () => { if (currentSimplifiedResult) processPattern(); },
+    onStrokeEnd: () => {
+      if (currentSimplifiedResult) processPattern();
+      persistSession();
+    },
+    onClear: () => {
+      if (currentSimplifiedResult) processPattern();
+      persistSession();
+    },
   });
 
   _setupCropPresets();
@@ -92,6 +107,7 @@ function restoreSession() {
   img.onload = () => {
     originalImage = img;
     originalDataUrl = session.imageDataUrl;
+    pendingPaintOverlayDataUrl = session.paintOverlayDataUrl || null;
     restoreControlValues(session);
     if (session.crop) {
       currentCrop = session.crop;
@@ -108,6 +124,7 @@ function persistSession() {
   const { numColors, quiltWidth, minPieceSize, curveComplexity, smoothness } = getControlValues();
   saveSession({
     imageDataUrl: originalDataUrl,
+    paintOverlayDataUrl: getPaintOverlayDataUrl(),
     crop: currentCrop,
     numColors,
     quiltWidth,
@@ -204,7 +221,7 @@ function _buildPaletteFromAssignments(assignments, palette, matchedPalette) {
  * Stage 1 — runs k-means quantization and region merging.
  * Triggered by: quiltWidth, colorSlider, minPieceSize, or a new crop.
  */
-function processQuantization() {
+async function processQuantization() {
   if (!originalImage || !currentCrop) return;
 
   const { numColors, quiltWidth, minPieceSize } = getControlValues();
@@ -253,6 +270,11 @@ function processQuantization() {
   const backgroundColorIndex = _chooseBackgroundColorIndex(matchedPalette);
 
   currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, palette: simplified.palette, matchedPalette, backgroundColorIndex };
+
+  if (pendingPaintOverlayDataUrl) {
+    await restorePaintOverlayFromDataUrl(pendingPaintOverlayDataUrl);
+    pendingPaintOverlayDataUrl = null;
+  }
 
   processPattern();
 }

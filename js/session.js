@@ -1,14 +1,16 @@
 /**
  * Session persistence: saves/restores app state to sessionStorage.
- * Stores: original image (as data URL), crop rect, slider settings.
+ * Stores: original image (as data URL), paint overlay (as data URL),
+ * crop rect, slider settings.
  */
 
 const STORAGE_KEY = 'applique-studio-session';
 
-export function saveSession({ imageDataUrl, crop, numColors, quiltWidth, minPieceSize, curveComplexity, smoothness }) {
+export function saveSession({ imageDataUrl, paintOverlayDataUrl, crop, numColors, quiltWidth, minPieceSize, curveComplexity, smoothness }) {
   try {
     const data = JSON.stringify({
       imageDataUrl,
+      paintOverlayDataUrl,
       crop,
       numColors,
       quiltWidth,
