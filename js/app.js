@@ -415,7 +415,7 @@ function _highlightSVGColor(activeColorIndex) {
 function _setupButtons() {
   document.getElementById('resetCropBtn').addEventListener('click', () => cropTool?.resetCrop());
   document.getElementById('applyCropBtn').addEventListener('click', applyCrop);
-  recropBtn.addEventListener('click', () => showCropStep());
+  recropBtn.addEventListener('click', (e) => { e.stopPropagation(); showCropStep(); });
 
   document.getElementById('newProjectBtn').addEventListener('click', () => {
     newProjectArea.classList.add('hidden');
