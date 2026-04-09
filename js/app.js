@@ -65,6 +65,7 @@ const canvasContainer = document.getElementById('canvasContainer');
 const originalCanvas = document.getElementById('originalCanvas');
 const patternCanvas = document.getElementById('patternCanvas');
 const paintOverlayCanvas = document.getElementById('paintOverlayCanvas');
+const brushCursorEl = document.getElementById('brushCursor');
 const paletteSection = document.getElementById('palette');
 const downloadBtn = document.getElementById('downloadBtn');
 const actionButtons = document.getElementById('actionButtons');
@@ -384,8 +385,22 @@ function setupPaintTools() {
 
   paintOverlayCanvas.addEventListener('pointerdown', beginOverlayStroke);
   paintOverlayCanvas.addEventListener('pointermove', continueOverlayStroke);
+  paintOverlayCanvas.addEventListener('pointermove', moveBrushCursor);
+  paintOverlayCanvas.addEventListener('pointerenter', () => { brushCursorEl.hidden = false; });
+  paintOverlayCanvas.addEventListener('pointerleave', () => { brushCursorEl.hidden = true; });
   paintOverlayCanvas.addEventListener('pointerup', endOverlayStroke);
   paintOverlayCanvas.addEventListener('pointercancel', endOverlayStroke);
+}
+
+function moveBrushCursor(event) {
+  const rect = paintOverlayCanvas.getBoundingClientRect();
+  const cssRadius = (paintState.brushSize / 2) * (rect.width / paintOverlayCanvas.width);
+  const cssX = event.clientX - rect.left;
+  const cssY = event.clientY - rect.top;
+  brushCursorEl.style.width = `${cssRadius * 2}px`;
+  brushCursorEl.style.height = `${cssRadius * 2}px`;
+  brushCursorEl.style.left = `${cssX - cssRadius}px`;
+  brushCursorEl.style.top = `${cssY - cssRadius}px`;
 }
 
 function setPaintMode(mode) {

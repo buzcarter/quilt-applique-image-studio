@@ -427,8 +427,16 @@ input[type="range"]::-moz-range-thumb {
   height: 100%;
   border-color: transparent;
   background: transparent;
-  cursor: crosshair;
+  cursor: none;
   touch-action: none;
+}
+
+#brushCursor {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 
 .paint-tool-btn--ghost {
