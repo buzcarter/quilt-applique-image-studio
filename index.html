@@ -130,11 +130,17 @@
                             <img src="images/icons/erase.svg" alt="Erase" width="16" height="16">
                         </label>
                     </div>
-                    <label class="paint-color-control" for="paintColorSelect">
-                        <span>Paint color</span>
-                        <span class="paint-color-chip" id="paintColorChip" aria-hidden="true"></span>
-                        <select id="paintColorSelect"></select>
-                    </label>
+                    <div class="paint-color-control">
+                        <span>Fabric:</span>
+                        <div class="fabric-select" id="paintColorSelect">
+                            <button type="button" class="fabric-select__trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="paint-color-chip" id="paintColorChip" aria-hidden="true"></span>
+                                <span class="fabric-select__value">—</span>
+                                <span class="fabric-select__caret" aria-hidden="true">▾</span>
+                            </button>
+                            <ul class="fabric-select__list" role="listbox" aria-label="Fabric color" hidden></ul>
+                        </div>
+                    </div>
                     <label class="paint-brush-control" for="brushSize">
                         <span>Brush size</span>
                         <input type="range" id="brushSize" min="4" max="60" value="18" step="1">
