@@ -185,7 +185,7 @@
                     <div id="fabricPickerGrid" class="fabric-picker__grid" role="listbox" aria-label="Kona colors"></div>
                 </div>
             </div>
-            <div class="color-swatches" id="colorSwatches"></div>
+            <ul class="color-swatches" id="colorSwatches"></ul>
         </section>
 
         <!-- Actions -->
@@ -198,7 +198,7 @@
     </main>
 
     <template id="tpl-swatch-fabric">
-        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+        <li class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
             <div class="color-box" style="background-color: {{FABRIC_HEX}}"></div>
             <div class="color-info">
                 <div class="fabric-name-row">
@@ -224,11 +224,11 @@
                     </button>
                 </div>
             </div>
-        </div>
+        </li>
     </template>
 
     <template id="tpl-swatch-raw">
-        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+        <li class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
             <div class="color-box" style="background-color: {{HEX}}"></div>
             <div class="color-info">
                 <div class="fabric-name-row">
@@ -237,7 +237,7 @@
                 </div>
                 <div class="color-percent">{{PERCENTAGE_PIECES}}</div>
             </div>
-        </div>
+        </li>
     </template>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
