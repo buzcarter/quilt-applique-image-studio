@@ -863,11 +863,10 @@ canvas {
 }
 
 .fabric-picker__chip {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    margin: -8px 1px -8px -8px;
 }
 
 .fabric-picker__label {
