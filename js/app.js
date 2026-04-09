@@ -30,6 +30,26 @@ let currentTotalPieces = 0;
 let currentPatternRender = null;
 let currentPatternSvgMarkup = '';
 
+function chooseBackgroundColorIndex(palette) {
+  if (!palette || palette.length === 0) return null;
+
+  const sorted = [...palette].sort((a, b) => {
+    const aPixels = Number(a.pixelCount || 0);
+    const bPixels = Number(b.pixelCount || 0);
+    if (bPixels !== aPixels) return bPixels - aPixels;
+
+    const aPercent = Number(a.percentage || 0);
+    const bPercent = Number(b.percentage || 0);
+    if (bPercent !== aPercent) return bPercent - aPercent;
+
+    const aLabel = String(a.fabric?.name || a.hex || '').toLowerCase();
+    const bLabel = String(b.fabric?.name || b.hex || '').toLowerCase();
+    return aLabel.localeCompare(bLabel);
+  });
+
+  return sorted[0]?.colorIndex ?? null;
+}
+
 // DOM refs
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
@@ -332,21 +352,28 @@ function processImage() {
   };
   renderPatternPreview(null);
 
-  // Step 5b: Generate smooth SVG pattern (piece counts come from SVG paths)
+  // Step 5b: Resolve fabric names first so alphabetical tie-breaks are human-readable.
+  const matchedPalette = matchPaletteToFabrics(simplified.palette);
+  const backgroundColorIndex = chooseBackgroundColorIndex(matchedPalette);
+
+  // Generate smooth SVG pattern (piece counts come from non-background SVG paths)
   const svgContainer = document.getElementById('svgContainer');
   const svgResult = generatePatternSVG(
-    simplified.assignments, processingW, processingH, simplified.palette
+    simplified.assignments,
+    processingW,
+    processingH,
+    simplified.palette,
+    backgroundColorIndex
   );
   currentPatternSvgMarkup = svgResult.svg;
   svgContainer.innerHTML = svgResult.svg;
 
-  // Apply SVG-derived piece counts to palette before display
-  for (const entry of simplified.palette) {
-    entry.pieceCount = svgResult.pieceCounts.get(entry.colorIndex) || 0;
-  }
-
   // Step 6: Match to fabrics and display
-  currentPalette = matchPaletteToFabrics(simplified.palette);
+  currentPalette = matchedPalette.map((entry) => ({
+    ...entry,
+    pieceCount: svgResult.pieceCounts.get(entry.colorIndex) || 0,
+    isBackground: entry.colorIndex === backgroundColorIndex,
+  }));
   currentTotalPieces = svgResult.totalPieces;
   displayPalette(currentPalette, currentTotalPieces);
 }
@@ -360,25 +387,30 @@ function displayPalette(palette, totalPieces) {
   for (const color of palette) {
     const swatch = document.createElement('div');
     swatch.className = 'color-swatch';
+    if (color.isBackground) {
+      swatch.classList.add('color-swatch--background');
+    }
     swatch.tabIndex = 0;
     swatch.dataset.colorIndex = String(color.colorIndex);
 
-    swatch.addEventListener('mouseenter', () => {
-      renderPatternPreview(color.colorIndex);
-      highlightSVGColor(color.colorIndex);
-    });
-    swatch.addEventListener('mouseleave', () => {
-      renderPatternPreview(null);
-      highlightSVGColor(null);
-    });
-    swatch.addEventListener('focus', () => {
-      renderPatternPreview(color.colorIndex);
-      highlightSVGColor(color.colorIndex);
-    });
-    swatch.addEventListener('blur', () => {
-      renderPatternPreview(null);
-      highlightSVGColor(null);
-    });
+    if (!color.isBackground) {
+      swatch.addEventListener('mouseenter', () => {
+        renderPatternPreview(color.colorIndex);
+        highlightSVGColor(color.colorIndex);
+      });
+      swatch.addEventListener('mouseleave', () => {
+        renderPatternPreview(null);
+        highlightSVGColor(null);
+      });
+      swatch.addEventListener('focus', () => {
+        renderPatternPreview(color.colorIndex);
+        highlightSVGColor(color.colorIndex);
+      });
+      swatch.addEventListener('blur', () => {
+        renderPatternPreview(null);
+        highlightSVGColor(null);
+      });
+    }
 
     if (color.fabric) {
       swatch.innerHTML = `
@@ -390,7 +422,7 @@ function displayPalette(palette, totalPieces) {
             <span class="fabric-sep">·</span>
             <span class="color-percent">${color.percentage}%</span>
             <span class="fabric-sep">·</span>
-            <span class="color-pieces">${formatPieceCount(color.pieceCount)}</span>
+              <span class="color-pieces">${color.isBackground ? 'Background' : formatPieceCount(color.pieceCount)}</span>
           </div>
           <div class="fabric-match-bar">
             <span class="match-swatch" style="background-color: ${color.hex}" title="Image color ${color.hex}"></span>
@@ -405,7 +437,7 @@ function displayPalette(palette, totalPieces) {
         <div class="color-box" style="background-color: ${color.hex}"></div>
         <div class="color-info">
           <div class="color-hex">${color.hex}</div>
-          <div class="color-percent">${color.percentage}% · ${formatPieceCount(color.pieceCount)}</div>
+          <div class="color-percent">${color.percentage}% · ${color.isBackground ? 'Background' : formatPieceCount(color.pieceCount)}</div>
         </div>
       `;
     }

@@ -10,13 +10,21 @@
  * @param {number} width - processing grid width
  * @param {number} height - processing grid height
  * @param {Array} palette - color entries with .hex, .colorIndex
+ * @param {number|null} backgroundColorIndex - colorIndex used as full-bleed background
  * @returns {{ svg: string, pieceCounts: Map<number, number>, totalPieces: number }}
  */
-export function generatePatternSVG(assignments, width, height, palette) {
+export function generatePatternSVG(assignments, width, height, palette, backgroundColorIndex = null) {
   const allPaths = [];
   const pieceCounts = new Map();
+  const backgroundEntry = palette.find((color) => color.colorIndex === backgroundColorIndex) || null;
+  const backgroundFill = backgroundEntry ? backgroundEntry.hex : '#fff';
 
   for (const color of palette) {
+    if (color.colorIndex === backgroundColorIndex) {
+      pieceCounts.set(color.colorIndex, 0);
+      continue;
+    }
+
     const contours = traceColorBoundary(assignments, width, height, color.colorIndex);
     let count = 0;
     for (const contour of contours) {
@@ -35,7 +43,7 @@ export function generatePatternSVG(assignments, width, height, palette) {
 
   const lines = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 ${width} ${height}" class="pattern-svg">`,
-    `<rect x="-0.5" y="-0.5" width="${width}" height="${height}" fill="#fff"/>`,
+    `<rect x="-0.5" y="-0.5" width="${width}" height="${height}" fill="${backgroundFill}"/>`,
   ];
 
   for (const p of allPaths) {
