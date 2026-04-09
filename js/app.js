@@ -5,18 +5,16 @@
  * 1. CROP — user selects region of interest (original always retained for re-crop)
  * 2. QUILT SIZE — user sets width in inches; height derived from crop aspect ratio
  * 3. COLOR QUANTIZATION — reduce to N fabric colors using k-means in CIELAB space
- * 4. MINIMUM PIECE SIZE — sets the working grid resolution (inches → pixels)
- *    Each grid cell = one "piece". Smaller = more detail, more cutting.
+ * 4. REGION MERGING — absorb isolated regions below the minimum piece threshold
  * 5. FABRIC MATCHING — map quantized colors to nearest Kona Cotton Solid
  * 6. DISPLAY — show pattern preview + fabric shopping list
  *
  * Future steps (not yet implemented):
- * - REGION MERGING — connected-component analysis, merge tiny islands
  * - EDGE SMOOTHING — contour simplification for organic shapes
  * - SVG OUTPUT — vector paths per fabric region (the real deliverable)
  */
 import { CropTool } from './crop-tool.js';
-import { quantizeColors } from './image-processing.js';
+import { quantizeColors, mergeSmallRegions } from './image-processing.js';
 import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
@@ -261,11 +259,10 @@ function processImage() {
     0, 0, currentCrop.w, currentCrop.h
   );
 
-  // Step 2: Calculate working resolution from quilt size + minimum piece size
-  // Each pixel in the working grid represents one "minimum piece"
-  const gridW = Math.max(4, Math.round(widthInches / pieceSize));
+  // Step 2: Choose a processing resolution that preserves contours.
+  const processingW = Math.min(currentCrop.w, Math.max(320, Math.min(1200, Math.round(widthInches * 24))));
   const aspectRatio = currentCrop.h / currentCrop.w;
-  const gridH = Math.max(4, Math.round(gridW * aspectRatio));
+  const processingH = Math.max(4, Math.round(processingW * aspectRatio));
 
   // Step 3: Display original (cropped) at screen resolution
   const maxDisplayWidth = 400;
@@ -277,29 +274,35 @@ function processImage() {
   originalCanvas.height = displayH;
   originalCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, displayW, displayH);
 
-  // Step 4: Downscale to working grid and quantize
+  // Step 4: Quantize at a higher resolution, then merge tiny isolated regions.
   const workCanvas = document.createElement('canvas');
-  workCanvas.width = gridW;
-  workCanvas.height = gridH;
-  workCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, gridW, gridH);
+  workCanvas.width = processingW;
+  workCanvas.height = processingH;
+  const workCtx = workCanvas.getContext('2d');
+  workCtx.imageSmoothingEnabled = true;
+  workCtx.drawImage(srcCanvas, 0, 0, processingW, processingH);
 
-  const imageData = workCanvas.getContext('2d').getImageData(0, 0, gridW, gridH);
+  const imageData = workCtx.getImageData(0, 0, processingW, processingH);
   const quantized = quantizeColors(imageData, numColors);
+  const pixelsPerInch = processingW / widthInches;
+  const minimumRegionPixels = Math.max(1, Math.round((pieceSize * pixelsPerInch) ** 2));
+  const simplified = mergeSmallRegions(quantized, minimumRegionPixels);
 
-  // Step 5: Render pattern preview (scale grid up to display size, no smoothing)
-  const gridCanvas = document.createElement('canvas');
-  gridCanvas.width = gridW;
-  gridCanvas.height = gridH;
-  gridCanvas.getContext('2d').putImageData(quantized.imageData, 0, 0);
+  // Step 5: Render pattern preview with smoothed scaling for organic boundaries.
+  const processedCanvas = document.createElement('canvas');
+  processedCanvas.width = processingW;
+  processedCanvas.height = processingH;
+  processedCanvas.getContext('2d').putImageData(simplified.imageData, 0, 0);
 
   patternCanvas.width = displayW;
   patternCanvas.height = displayH;
   const patternCtx = patternCanvas.getContext('2d');
-  patternCtx.imageSmoothingEnabled = false;
-  patternCtx.drawImage(gridCanvas, 0, 0, gridW, gridH, 0, 0, displayW, displayH);
+  patternCtx.imageSmoothingEnabled = true;
+  patternCtx.clearRect(0, 0, displayW, displayH);
+  patternCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
 
   // Step 6: Match to fabrics and display
-  currentPalette = matchPaletteToFabrics(quantized.palette);
+  currentPalette = matchPaletteToFabrics(simplified.palette);
   displayPalette(currentPalette);
 }
 

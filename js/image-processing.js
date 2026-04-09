@@ -5,7 +5,7 @@ import { rgbToLab, deltaE, rgbToHex } from './color-science.js';
 
 /**
  * K-means color quantization using perceptual (Lab) color distance.
- * Returns quantized ImageData and palette with percentages.
+ * Returns quantized ImageData, assignments, and palette with percentages.
  */
 export function quantizeColors(imageData, numColors) {
   const { data, width, height } = imageData;
@@ -65,33 +65,50 @@ export function quantizeColors(imageData, numColors) {
     }
   }
 
-  // Build output image and count pixels per color
-  const colorCounts = new Uint32Array(numColors);
-  const outData = new Uint8ClampedArray(data.length);
+  return buildQuantizedResult(assignments, width, height, centroids, centroidLabs);
+}
 
-  for (let i = 0; i < pixelCount; i++) {
-    const c = assignments[i];
-    const off = i * 4;
-    colorCounts[c]++;
-    outData[off] = centroids[c][0];
-    outData[off + 1] = centroids[c][1];
-    outData[off + 2] = centroids[c][2];
-    outData[off + 3] = 255;
+/**
+ * Merge isolated same-color regions smaller than the threshold into neighbors.
+ */
+export function mergeSmallRegions(quantized, minRegionPixels) {
+  if (!minRegionPixels || minRegionPixels <= 1) {
+    return quantized;
   }
 
-  const palette = centroids.map((rgb, idx) => ({
-    rgb,
-    hex: rgbToHex(rgb[0], rgb[1], rgb[2]),
-    lab: centroidLabs[idx],
-    percentage: ((colorCounts[idx] / pixelCount) * 100).toFixed(1),
-  }));
+  const { width, height, centroids, centroidLabs } = quantized;
+  const assignments = quantized.assignments.slice();
 
-  palette.sort((a, b) => b.percentage - a.percentage);
+  for (let pass = 0; pass < 4; pass++) {
+    const regions = collectRegions(assignments, width, height);
+    const smallRegions = regions
+      .filter(region => region.size < minRegionPixels)
+      .sort((left, right) => left.size - right.size);
 
-  return {
-    imageData: new ImageData(outData, width, height),
-    palette,
-  };
+    if (smallRegions.length === 0) {
+      break;
+    }
+
+    let mergedAny = false;
+
+    for (const region of smallRegions) {
+      const targetColor = chooseMergeTarget(region, centroidLabs);
+      if (targetColor === null) {
+        continue;
+      }
+
+      for (const pixelIndex of region.pixels) {
+        assignments[pixelIndex] = targetColor;
+      }
+      mergedAny = true;
+    }
+
+    if (!mergedAny) {
+      break;
+    }
+  }
+
+  return buildQuantizedResult(assignments, width, height, centroids, centroidLabs);
 }
 
 /** K-means++ initialization for better centroid seeding */
@@ -137,23 +154,117 @@ function initCentroids(pixels, pixelLabs, k) {
 }
 
 /**
- * Downscale image to working resolution based on detail level.
- * Returns { canvas, ctx, width, height } of the downscaled temp canvas.
+ * Build image data and palette from assignments.
  */
-export function downscaleForProcessing(sourceImage, detail) {
-  const maxWidth = 400;
-  const scale = maxWidth / sourceImage.width;
-  const displayWidth = Math.floor(sourceImage.width * scale);
-  const displayHeight = Math.floor(sourceImage.height * scale);
+function buildQuantizedResult(assignments, width, height, centroids, centroidLabs) {
+  const pixelCount = width * height;
+  const colorCounts = new Uint32Array(centroids.length);
+  const outData = new Uint8ClampedArray(pixelCount * 4);
 
-  const workWidth = Math.floor(displayWidth * (detail / 100));
-  const workHeight = Math.floor(displayHeight * (detail / 100));
+  for (let i = 0; i < pixelCount; i++) {
+    const colorIndex = assignments[i];
+    const off = i * 4;
+    const rgb = centroids[colorIndex];
 
-  const canvas = document.createElement('canvas');
-  canvas.width = workWidth;
-  canvas.height = workHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(sourceImage, 0, 0, workWidth, workHeight);
+    colorCounts[colorIndex]++;
+    outData[off] = rgb[0];
+    outData[off + 1] = rgb[1];
+    outData[off + 2] = rgb[2];
+    outData[off + 3] = 255;
+  }
 
-  return { canvas, ctx, width: workWidth, height: workHeight, displayWidth, displayHeight };
+  const palette = centroids
+    .map((rgb, idx) => ({
+      rgb,
+      hex: rgbToHex(rgb[0], rgb[1], rgb[2]),
+      lab: centroidLabs[idx],
+      percentage: ((colorCounts[idx] / pixelCount) * 100).toFixed(1),
+      pixelCount: colorCounts[idx],
+    }))
+    .filter(entry => entry.pixelCount > 0)
+    .sort((a, b) => b.pixelCount - a.pixelCount);
+
+  return {
+    width,
+    height,
+    assignments,
+    centroids,
+    centroidLabs,
+    imageData: new ImageData(outData, width, height),
+    palette,
+  };
+}
+
+function collectRegions(assignments, width, height) {
+  const visited = new Uint8Array(assignments.length);
+  const regions = [];
+
+  for (let start = 0; start < assignments.length; start++) {
+    if (visited[start]) {
+      continue;
+    }
+
+    const colorIndex = assignments[start];
+    const stack = [start];
+    const pixels = [];
+    const borderCounts = new Map();
+    visited[start] = 1;
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      pixels.push(current);
+
+      const x = current % width;
+      const y = Math.floor(current / width);
+      addRegionNeighbor(x - 1, y, colorIndex, assignments, visited, width, height, stack, borderCounts);
+      addRegionNeighbor(x + 1, y, colorIndex, assignments, visited, width, height, stack, borderCounts);
+      addRegionNeighbor(x, y - 1, colorIndex, assignments, visited, width, height, stack, borderCounts);
+      addRegionNeighbor(x, y + 1, colorIndex, assignments, visited, width, height, stack, borderCounts);
+    }
+
+    regions.push({
+      colorIndex,
+      pixels,
+      size: pixels.length,
+      borderCounts,
+    });
+  }
+
+  return regions;
+}
+
+function addRegionNeighbor(x, y, regionColor, assignments, visited, width, height, stack, borderCounts) {
+  if (x < 0 || x >= width || y < 0 || y >= height) {
+    return;
+  }
+
+  const index = y * width + x;
+  const neighborColor = assignments[index];
+
+  if (neighborColor === regionColor) {
+    if (!visited[index]) {
+      visited[index] = 1;
+      stack.push(index);
+    }
+    return;
+  }
+
+  borderCounts.set(neighborColor, (borderCounts.get(neighborColor) || 0) + 1);
+}
+
+function chooseMergeTarget(region, centroidLabs) {
+  let bestColor = null;
+  let bestBorder = -1;
+  let bestDistance = Infinity;
+
+  for (const [neighborColor, borderLength] of region.borderCounts.entries()) {
+    const distance = deltaE(centroidLabs[region.colorIndex], centroidLabs[neighborColor]);
+    if (borderLength > bestBorder || (borderLength === bestBorder && distance < bestDistance)) {
+      bestColor = neighborColor;
+      bestBorder = borderLength;
+      bestDistance = distance;
+    }
+  }
+
+  return bestColor;
 }
