@@ -3,6 +3,7 @@
  * Converts pixel-based color assignments into smooth SVG paths
  * using marching squares, RDP simplification, and Catmull-Rom smoothing.
  */
+import { config } from './config.js';
 
 /**
  * Generate SVG markup from quantized color assignments.
@@ -42,8 +43,9 @@ export function generatePatternSVG(assignments, width, height, palette, options 
       const simplified = simplifyClosedPath(contour, simplifyTolerance);
       if (simplified.length < 3) continue;
       const perimeterPx = _polylineLength(simplified);
+      if (perimeterPx <= config.svg.min_perimiter_length) continue;
       _pathLog.push({ index: allPaths.length, color: color.hex, pts: simplified.length, perimeter: perimeterPx });
-      count++
+      count++;
       allPaths.push({
         d: smoothToSVGPath(simplified, smoothness),
         fill: color.hex,
