@@ -5,7 +5,7 @@
 
 let refs = null;
 let currentColorIndex = null;
-let currentFabricNumber = null;
+let currentFabricKey = null;
 let onSelectFabric = null;
 let getFabrics = null;
 
@@ -33,8 +33,8 @@ export function initFabricPicker({ onSelect, getLibrary }) {
     const option = target.closest('.fabric-picker__option');
     if (!option) return;
 
-    const number = option.dataset.fabricNumber;
-    const fabric = (getFabrics() || []).find((entry) => String(entry.number) === number);
+    const key = option.dataset.fabricKey;
+    const fabric = (getFabrics() || []).find((entry) => _fabricKey(entry) === key);
     if (!fabric || currentColorIndex == null) return;
 
     onSelectFabric(currentColorIndex, fabric);
@@ -58,7 +58,7 @@ export function openFabricPicker({ colorIndex, currentFabric, sourceLabel }) {
   if (!refs) return;
 
   currentColorIndex = colorIndex;
-  currentFabricNumber = currentFabric?.number ? String(currentFabric.number) : null;
+  currentFabricKey = currentFabric ? _fabricKey(currentFabric) : null;
   refs.title.textContent = sourceLabel
     ? `Choose Kona color for ${sourceLabel}`
     : 'Choose Kona color';
@@ -76,7 +76,7 @@ export function closeFabricPicker() {
   refs.overlay.classList.add('hidden');
   refs.overlay.setAttribute('aria-hidden', 'true');
   currentColorIndex = null;
-  currentFabricNumber = null;
+  currentFabricKey = null;
 }
 
 function _isHidden() {
@@ -100,13 +100,14 @@ function _renderOptions(fabrics) {
   refs.grid.replaceChildren();
 
   for (const fabric of fabrics) {
+    const key = _fabricKey(fabric);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'fabric-picker__option';
-    button.dataset.fabricNumber = String(fabric.number || '');
+    button.dataset.fabricKey = key;
     button.setAttribute('role', 'option');
 
-    if (currentFabricNumber && currentFabricNumber === String(fabric.number)) {
+    if (currentFabricKey && currentFabricKey === key) {
       button.classList.add('is-selected');
       button.setAttribute('aria-selected', 'true');
     } else {
@@ -131,4 +132,11 @@ function _renderOptions(fabrics) {
     empty.textContent = 'No Kona colors match that search.';
     refs.grid.appendChild(empty);
   }
+}
+
+function _fabricKey(fabric) {
+  const number = String(fabric?.number || '').trim();
+  const name = String(fabric?.name || '').trim().toLowerCase();
+  const hex = String(fabric?.hex || '').trim().toLowerCase();
+  return `${number}|${name}|${hex}`;
 }

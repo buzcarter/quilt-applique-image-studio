@@ -736,11 +736,15 @@ canvas {
   min-height: 28px;
   font-size: 11px;
   border-radius: 999px;
-  background: #6f7f78;
+  border: 1px solid #9eb6ac;
+  background: transparent;
+  color: #4e665c;
 }
 
 .swatch-change-btn:hover {
-  background: #5f6d68;
+  background: #edf4f0;
+  border-color: #7fa191;
+  color: #355247;
 }
 
 .swatch-change-btn img {

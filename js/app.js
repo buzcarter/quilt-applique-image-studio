@@ -318,11 +318,20 @@ function processPattern() {
   );
   const backgroundColorIndex = _chooseBackgroundColorIndex(updatedMatchedPalette);
 
+  // Final SVG colors should follow mapped Kona colors (including user overrides),
+  // while geometry still follows the quantized assignment map.
+  const svgPalette = updatedPalette.map((entry) => {
+    const mapped = updatedMatchedPalette.find((candidate) => candidate.colorIndex === entry.colorIndex);
+    return mapped?.fabric?.hex
+      ? { ...entry, hex: mapped.fabric.hex }
+      : entry;
+  });
+
   const svgResult = generatePatternSVG(
     mergedSource.assignments,
     processingW,
     processingH,
-    updatedPalette,
+    svgPalette,
     { backgroundColorIndex, curveComplexity, smoothness }
   );
   currentPatternSvgMarkup = svgResult.svg;
