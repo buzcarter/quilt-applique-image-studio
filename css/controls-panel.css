@@ -1,0 +1,85 @@
+/* Controls */
+.controls {
+  margin: 20px 0;
+  padding: 14px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.control-group {
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.control-group:last-child {
+  margin-bottom: 0;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-step-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid #b8c7c2;
+  background: #eef4f1;
+  color: #2c5f4f;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 0;
+}
+
+.slider-step-btn:hover {
+  background: #dce9e3;
+}
+
+.slider-step-btn:focus {
+  outline: 2px solid rgba(44, 95, 79, 0.3);
+  outline-offset: 1px;
+}
+
+.slider-step-btn img {
+  vertical-align: middle;
+}
+
+.slider-min,
+.slider-max {
+  font-size: 10px;
+  color: #aaa;
+  flex-shrink: 0;
+  min-width: 18px;
+}
+
+.slider-min {
+  text-align: right;
+}
+
+.slider-max {
+  text-align: left;
+}
+
+.value-display {
+  min-width: 34px;
+  text-align: right;
+  font-weight: 600;
+  color: #2c5f4f;
+  font-size: 14px;
+}
+
+.control-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #888;
+}

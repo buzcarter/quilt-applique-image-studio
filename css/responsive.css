@@ -1,0 +1,53 @@
+/* Responsive */
+@media (max-width: 768px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .control-group {
+    padding: 10px;
+  }
+
+  .canvas-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .paint-tools {
+    justify-content: flex-start;
+  }
+
+  .paint-mode-toggle,
+  .paint-color-control,
+  .paint-brush-control {
+    width: 100%;
+    border-radius: 10px;
+  }
+
+  .paint-color-control select,
+  .paint-brush-control input[type="range"] {
+    flex: 1;
+    max-width: none;
+  }
+
+  .paint-brush-control {
+    justify-content: space-between;
+  }
+
+  .panel-sidebar {
+    flex-direction: row;
+    order: 1;
+  }
+
+  .panel-hero {
+    order: 0;
+  }
+
+  .container {
+    padding: 20px;
+  }
+
+  .color-swatches {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}

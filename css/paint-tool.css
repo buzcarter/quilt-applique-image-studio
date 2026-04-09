@@ -1,0 +1,221 @@
+/* Paint tools */
+.paint-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.paint-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid #d9e2dd;
+  border-radius: 999px;
+  background: #f5f8f7;
+}
+
+.paint-mode-toggle input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.paint-mode-option {
+  margin: 0;
+  padding: 6px 10px;
+  min-height: 30px;
+  border-radius: 999px;
+  line-height: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #587066;
+  cursor: pointer;
+}
+
+.paint-mode-toggle input[type="radio"]:checked + .paint-mode-option {
+  background: #1f5d4d;
+  color: #fff;
+}
+
+.paint-mode-toggle input[type="radio"]:checked + .paint-mode-option img {
+  filter: brightness(0) invert(1);
+}
+
+.paint-color-control,
+.paint-brush-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d9e2dd;
+  border-radius: 999px;
+  background: #f5f8f7;
+  color: #2c5f4f;
+}
+
+.paint-color-control span,
+.paint-brush-control span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.paint-color-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #2c5f4f;
+  flex: 0 0 auto;
+}
+
+.fabric-select {
+  position: relative;
+}
+
+.fabric-select__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #d0d8d4;
+  border-radius: 4px;
+  padding: 3px 6px 3px 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c5f4f;
+  cursor: pointer;
+  line-height: 1.4;
+  max-width: 180px;
+}
+
+.fabric-select__trigger:hover {
+  background: #f0f7f4;
+}
+
+.fabric-select__value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabric-select__caret {
+  color: #999;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.fabric-select__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #d0d8d4;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  padding: 4px 0;
+  z-index: 100;
+}
+
+.fabric-select__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.fabric-select__option:hover {
+  background: #f0f7f4;
+}
+
+.fabric-select__option[aria-selected="true"] {
+  background: #e8f4ef;
+  font-weight: 600;
+}
+
+/* .paint-color-control select removed — replaced by .fabric-select custom dropdown */
+.paint-color-control-select-unused {
+  max-width: 170px;
+  border: none;
+  background: transparent;
+  color: #2c5f4f;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.paint-brush-control input[type="range"] {
+  width: 92px;
+}
+
+.paint-brush-value {
+  min-width: 34px;
+  text-align: right;
+}
+
+.canvas-stack {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.canvas-stack canvas {
+  margin: 0;
+}
+
+#paintOverlayCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-color: transparent;
+  background: transparent;
+  cursor: none;
+  touch-action: none;
+}
+
+#brushCursor {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.paint-tool-btn--ghost {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  min-height: 30px;
+  flex: 0 0 auto;
+  background: #78847f;
+}
+
+.paint-tool-btn--ghost:hover {
+  background: #626d69;
+}
+
+.panel-sidebar .paint-tools {
+  display: none;
+}
+
+.panel-sidebar #paintOverlayCanvas {
+  pointer-events: none;
+}
+
+.panel-hero .simplified-stack {
+  max-width: 100%;
+}

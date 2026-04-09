@@ -1,0 +1,106 @@
+/* Canvas display */
+.canvas-container {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 2.15fr);
+  grid-template-rows: 1fr;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.panel-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-hero {
+  display: flex;
+  align-items: flex-start;
+  max-height: 500px;
+}
+
+.panel-hero canvas,
+.panel-hero .pattern-svg {
+  max-height: 450px;
+  width: auto;
+}
+
+.canvas-wrapper {
+  position: relative;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 8px;
+  transition: box-shadow 0.15s;
+}
+
+.canvas-corner-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  padding: 6px;
+  line-height: 0;
+  border-radius: 5px;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+.canvas-corner-btn img {
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.canvas-panel-icon {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.panel-hero .canvas-panel-icon {
+  display: none;
+}
+
+.canvas-corner-btn:hover {
+  opacity: 1;
+}
+
+.panel-sidebar .canvas-wrapper:hover {
+  box-shadow: 0 0 0 2px #2c5f4f;
+}
+
+.panel-hero .canvas-wrapper {
+  cursor: default;
+  flex: 1;
+}
+
+.canvas-wrapper h3 {
+  margin-bottom: 10px;
+  color: #2c5f4f;
+  font-size: 16px;
+}
+
+.panel-stats {
+  margin-top: 8px;
+  color: #4f5e58;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.panel-stats-sep {
+  color: #a7b7b1;
+}
+
+.panel-sidebar .canvas-wrapper h3 {
+  font-size: 13px;
+  margin-bottom: 6px;
+}

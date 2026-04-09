@@ -1,0 +1,145 @@
+.fabric-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.fabric-picker.hidden {
+  display: none;
+}
+
+.fabric-picker__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 34, 30, 0.52);
+}
+
+.fabric-picker__panel {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(78vh, 700px);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #d9e4df;
+  box-shadow: 0 16px 42px rgba(20, 29, 25, 0.24);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabric-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fabric-picker__header h4 {
+  color: #2c5f4f;
+  font-size: 16px;
+}
+
+.fabric-picker__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  background: #73847d;
+}
+
+.fabric-picker__hint {
+  color: #666;
+  font-size: 13px;
+}
+
+.fabric-picker__search-row {
+  display: flex;
+}
+
+.fabric-picker__search {
+  width: 100%;
+  border: 1px solid #ccd8d2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.fabric-picker__search:focus {
+  outline: 2px solid rgba(44, 95, 79, 0.25);
+  border-color: #7ca496;
+}
+
+.fabric-picker__grid {
+  overflow: auto;
+  border: 1px solid #e4ece8;
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.fabric-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #dce8e2;
+  background: #f8fbf9;
+  color: #2b3f37;
+  font-size: 12px;
+  text-align: left;
+}
+
+.fabric-picker__option:hover {
+  background: #edf4f0;
+  border-color: #aac3b8;
+}
+
+.fabric-picker__option.is-selected {
+  border-color: #2c5f4f;
+  box-shadow: 0 0 0 2px rgba(44, 95, 79, 0.14);
+}
+
+.fabric-picker__chip {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  margin: -8px 1px -8px -8px;
+}
+
+.fabric-picker__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fabric-picker__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabric-picker__sku {
+  color: #999;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.fabric-picker__empty {
+  color: #777;
+  font-size: 13px;
+  padding: 8px;
+}
