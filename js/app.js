@@ -84,10 +84,13 @@ const eraseModeBtn = document.getElementById('eraseModeBtn');
 const clearOverlayBtn = document.getElementById('clearOverlayBtn');
 const brushSize = document.getElementById('brushSize');
 const brushSizeValue = document.getElementById('brushSizeValue');
+const paintColorSelect = document.getElementById('paintColorSelect');
+const paintColorChip = document.getElementById('paintColorChip');
 
 const paintState = {
   mode: 'paint',
   brushSize: 18,
+  color: '#2c5f4f',
   isDrawing: false,
   lastPoint: null,
 };
@@ -344,15 +347,16 @@ function updateQuiltDimensions() {
 function setupPaintTools() {
   updateBrushSizeLabel();
   setPaintMode('paint');
+  refreshPaintColorOptions([]);
 
-  paintModeBtn.addEventListener('click', (event) => {
+  paintModeBtn.addEventListener('change', (event) => {
     event.stopPropagation();
-    setPaintMode('paint');
+    if (paintModeBtn.checked) setPaintMode('paint');
   });
 
-  eraseModeBtn.addEventListener('click', (event) => {
+  eraseModeBtn.addEventListener('change', (event) => {
     event.stopPropagation();
-    setPaintMode('erase');
+    if (eraseModeBtn.checked) setPaintMode('erase');
   });
 
   clearOverlayBtn.addEventListener('click', (event) => {
@@ -366,7 +370,13 @@ function setupPaintTools() {
     updateBrushSizeLabel();
   });
 
-  for (const element of [paintModeBtn, eraseModeBtn, clearOverlayBtn, brushSize]) {
+  paintColorSelect.addEventListener('change', (event) => {
+    event.stopPropagation();
+    paintState.color = paintColorSelect.value || paintState.color;
+    updatePaintColorChip();
+  });
+
+  for (const element of [paintModeBtn, eraseModeBtn, clearOverlayBtn, brushSize, paintColorSelect]) {
     element.addEventListener('pointerdown', (event) => event.stopPropagation());
     element.addEventListener('click', (event) => event.stopPropagation());
   }
@@ -379,12 +389,34 @@ function setupPaintTools() {
 
 function setPaintMode(mode) {
   paintState.mode = mode === 'erase' ? 'erase' : 'paint';
-  paintModeBtn.classList.toggle('is-active', paintState.mode === 'paint');
-  eraseModeBtn.classList.toggle('is-active', paintState.mode === 'erase');
+  paintModeBtn.checked = paintState.mode === 'paint';
+  eraseModeBtn.checked = paintState.mode === 'erase';
 }
 
 function updateBrushSizeLabel() {
   brushSizeValue.textContent = `${brushSize.value} px`;
+}
+
+function updatePaintColorChip() {
+  paintColorChip.style.backgroundColor = paintState.color;
+}
+
+function refreshPaintColorOptions(palette) {
+  const previousValue = paintColorSelect.value || paintState.color;
+  paintColorSelect.innerHTML = '';
+
+  const options = palette.length > 0 ? palette : [{ hex: '#2c5f4f', fabric: { name: 'Default Green' } }];
+  for (const entry of options) {
+    const option = document.createElement('option');
+    option.value = entry.fabric?.hex || entry.hex;
+    option.textContent = entry.fabric?.name || entry.hex;
+    paintColorSelect.appendChild(option);
+  }
+
+  const hasPrevious = options.some((entry) => (entry.fabric?.hex || entry.hex) === previousValue);
+  paintColorSelect.value = hasPrevious ? previousValue : (options[0].fabric?.hex || options[0].hex);
+  paintState.color = paintColorSelect.value;
+  updatePaintColorChip();
 }
 
 function clearPaintOverlay() {
@@ -434,7 +466,7 @@ function drawOverlaySegment(fromPoint, toPoint) {
     ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
   } else {
     ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = 'rgba(44, 95, 79, 0.42)';
+    ctx.strokeStyle = paintState.color;
   }
 
   ctx.beginPath();
@@ -610,6 +642,7 @@ function displayPalette(palette, totalPieces) {
   document.getElementById('pieceCount').textContent = totalPieces;
   document.getElementById('patternPanelFabricCount').textContent = palette.length;
   document.getElementById('patternPanelPieceCount').textContent = totalPieces;
+  refreshPaintColorOptions(palette);
   const container = document.getElementById('colorSwatches');
   container.innerHTML = '';
 

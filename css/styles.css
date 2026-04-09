@@ -332,27 +332,38 @@ input[type="range"]::-moz-range-thumb {
   margin-bottom: 8px;
 }
 
-.paint-tool-btn {
-  padding: 6px 10px;
+.paint-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid #d9e2dd;
+  border-radius: 999px;
+  background: #f5f8f7;
+}
+
+.paint-mode-toggle input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.paint-mode-option {
+  margin: 0;
+  padding: 6px 12px;
+  min-height: 30px;
+  border-radius: 999px;
   font-size: 12px;
   line-height: 1;
-  border-radius: 999px;
-  min-height: 30px;
-  flex: 0 0 auto;
+  color: #587066;
+  cursor: pointer;
 }
 
-.paint-tool-btn.is-active {
+.paint-mode-toggle input[type="radio"]:checked + .paint-mode-option {
   background: #1f5d4d;
+  color: #fff;
 }
 
-.paint-tool-btn--ghost {
-  background: #78847f;
-}
-
-.paint-tool-btn--ghost:hover {
-  background: #626d69;
-}
-
+.paint-color-control,
 .paint-brush-control {
   display: inline-flex;
   align-items: center;
@@ -364,9 +375,29 @@ input[type="range"]::-moz-range-thumb {
   color: #2c5f4f;
 }
 
+.paint-color-control span,
 .paint-brush-control span {
   font-size: 11px;
   font-weight: 700;
+}
+
+.paint-color-chip {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #2c5f4f;
+  flex: 0 0 auto;
+}
+
+.paint-color-control select {
+  max-width: 170px;
+  border: none;
+  background: transparent;
+  color: #2c5f4f;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
 }
 
 .paint-brush-control input[type="range"] {
@@ -398,6 +429,20 @@ input[type="range"]::-moz-range-thumb {
   background: transparent;
   cursor: crosshair;
   touch-action: none;
+}
+
+.paint-tool-btn--ghost {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  min-height: 30px;
+  flex: 0 0 auto;
+  background: #78847f;
+}
+
+.paint-tool-btn--ghost:hover {
+  background: #626d69;
 }
 
 .panel-sidebar .paint-tools {
@@ -651,14 +696,21 @@ button:disabled {
     justify-content: flex-start;
   }
 
+  .paint-mode-toggle,
+  .paint-color-control,
   .paint-brush-control {
     width: 100%;
-    justify-content: space-between;
     border-radius: 10px;
   }
 
+  .paint-color-control select,
   .paint-brush-control input[type="range"] {
     flex: 1;
+    max-width: none;
+  }
+
+  .paint-brush-control {
+    justify-content: space-between;
   }
 
   .panel-sidebar {
