@@ -16,6 +16,7 @@
 import { CropTool } from './crop-tool.js';
 import { quantizeColors, mergeSmallRegions } from './image-processing.js';
 import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
+import { generatePatternSVG } from './svg-tracer.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
 
@@ -329,9 +330,21 @@ function processImage() {
   };
   renderPatternPreview(null);
 
+  // Step 5b: Generate smooth SVG pattern (piece counts come from SVG paths)
+  const svgContainer = document.getElementById('svgContainer');
+  const svgResult = generatePatternSVG(
+    simplified.assignments, processingW, processingH, simplified.palette
+  );
+  svgContainer.innerHTML = svgResult.svg;
+
+  // Apply SVG-derived piece counts to palette before display
+  for (const entry of simplified.palette) {
+    entry.pieceCount = svgResult.pieceCounts.get(entry.colorIndex) || 0;
+  }
+
   // Step 6: Match to fabrics and display
   currentPalette = matchPaletteToFabrics(simplified.palette);
-  currentTotalPieces = simplified.totalPieces;
+  currentTotalPieces = svgResult.totalPieces;
   displayPalette(currentPalette, currentTotalPieces);
 }
 
@@ -349,15 +362,19 @@ function displayPalette(palette, totalPieces) {
 
     swatch.addEventListener('mouseenter', () => {
       renderPatternPreview(color.colorIndex);
+      highlightSVGColor(color.colorIndex);
     });
     swatch.addEventListener('mouseleave', () => {
       renderPatternPreview(null);
+      highlightSVGColor(null);
     });
     swatch.addEventListener('focus', () => {
       renderPatternPreview(color.colorIndex);
+      highlightSVGColor(color.colorIndex);
     });
     swatch.addEventListener('blur', () => {
       renderPatternPreview(null);
+      highlightSVGColor(null);
     });
 
     if (color.fabric) {
@@ -459,6 +476,24 @@ function getSelectedMaskCanvas(colorIndex) {
 
   currentPatternRender.maskCache.set(colorIndex, maskCanvas);
   return maskCanvas;
+}
+
+function highlightSVGColor(activeColorIndex) {
+  const container = document.getElementById('svgContainer');
+  if (!container) return;
+
+  if (activeColorIndex === null || activeColorIndex === undefined) {
+    container.classList.remove('highlight');
+    for (const path of container.querySelectorAll('path.active')) {
+      path.classList.remove('active');
+    }
+    return;
+  }
+
+  container.classList.add('highlight');
+  for (const path of container.querySelectorAll('path')) {
+    path.classList.toggle('active', path.dataset.colorIndex === String(activeColorIndex));
+  }
 }
 
 // --- Buttons ---
