@@ -77,15 +77,17 @@
 
         <!-- Step 4: Preview -->
         <div id="canvasContainer" class="canvas-container hidden">
-            <div class="canvas-wrapper">
+            <div class="panel-sidebar" id="panelSidebar"></div>
+            <div class="panel-hero" id="panelHero"></div>
+            <div class="canvas-wrapper" data-panel="original" data-order="0">
                 <h3>Original</h3>
                 <canvas id="originalCanvas"></canvas>
             </div>
-            <div class="canvas-wrapper">
+            <div class="canvas-wrapper" data-panel="simplified" data-order="1">
                 <h3>Simplified</h3>
                 <canvas id="patternCanvas"></canvas>
             </div>
-            <div class="canvas-wrapper">
+            <div class="canvas-wrapper" data-panel="pattern" data-order="2">
                 <h3>Pattern</h3>
                 <div id="svgContainer"></div>
             </div>

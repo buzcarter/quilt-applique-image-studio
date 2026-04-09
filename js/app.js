@@ -67,6 +67,7 @@ async function init() {
   setupControls();
   setupCropPresets();
   setupButtons();
+  setupPanelLayout();
   restoreSession();
 }
 
@@ -494,6 +495,37 @@ function highlightSVGColor(activeColorIndex) {
   for (const path of container.querySelectorAll('path')) {
     path.classList.toggle('active', path.dataset.colorIndex === String(activeColorIndex));
   }
+}
+
+// --- Panel Layout (sidebar + hero) ---
+let currentHeroPanel = 'pattern';
+
+function setupPanelLayout() {
+  const panels = canvasContainer.querySelectorAll('.canvas-wrapper[data-panel]');
+  for (const panel of panels) {
+    panel.addEventListener('click', () => {
+      promoteToHero(panel.dataset.panel);
+    });
+  }
+  promoteToHero(currentHeroPanel);
+}
+
+function promoteToHero(panelName) {
+  currentHeroPanel = panelName;
+  const sidebar = document.getElementById('panelSidebar');
+  const hero = document.getElementById('panelHero');
+  const panels = Array.from(canvasContainer.querySelectorAll('.canvas-wrapper[data-panel]'));
+
+  // Sort non-hero panels by their original order
+  const sidebarPanels = panels
+    .filter(p => p.dataset.panel !== panelName)
+    .sort((a, b) => +a.dataset.order - +b.dataset.order);
+
+  const heroPanel = panels.find(p => p.dataset.panel === panelName);
+
+  // Move panels into their containers
+  sidebar.replaceChildren(...sidebarPanels);
+  hero.replaceChildren(heroPanel);
 }
 
 // --- Buttons ---
