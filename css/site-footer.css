@@ -1,0 +1,29 @@
+.site-footer {
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 1px solid #e5ebe8;
+  color: #6c7772;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.site-footer a {
+  color: #2c5f4f;
+  font-weight: 600;
+}
+
+.site-footer__github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.site-footer__github-link img {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.site-footer a:hover {
+  color: #234a3d;
+}

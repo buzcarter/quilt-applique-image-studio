@@ -105,3 +105,5 @@ Open `http://applique-studio.log/` (or `http://applique-studio.log/index.html`) 
 --
 
 [Orchid Line Interface Icons Collection](https://www.svgrepo.com/collection/orchid-line-interface-icons)
+
+Includes `images/icons/github.svg` from that collection.
