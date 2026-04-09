@@ -293,12 +293,32 @@ input[type="range"]::-moz-range-thumb {
   position: absolute;
   bottom: 12px;
   right: 12px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 6px;
+  line-height: 0;
   border-radius: 5px;
   opacity: 0.8;
   z-index: 1;
+}
+
+.canvas-corner-btn img {
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.canvas-panel-icon {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.panel-hero .canvas-panel-icon {
+  display: none;
 }
 
 .canvas-corner-btn:hover {
@@ -366,9 +386,10 @@ input[type="range"]::-moz-range-thumb {
 
 .paint-mode-option {
   margin: 0;
-  padding: 6px 12px;
+  padding: 6px 10px;
   min-height: 30px;
   border-radius: 999px;
+  line-height: 0;
   font-size: 12px;
   line-height: 1;
   color: #587066;
@@ -378,6 +399,10 @@ input[type="range"]::-moz-range-thumb {
 .paint-mode-toggle input[type="radio"]:checked + .paint-mode-option {
   background: #1f5d4d;
   color: #fff;
+}
+
+.paint-mode-toggle input[type="radio"]:checked + .paint-mode-option img {
+  filter: brightness(0) invert(1);
 }
 
 .paint-color-control,

@@ -112,16 +112,23 @@
             <div class="canvas-wrapper" data-panel="original" data-order="0">
                 <h3>Original</h3>
                 <canvas id="originalCanvas"></canvas>
-                <button id="recropBtn" class="btn-secondary canvas-corner-btn hidden">Re-crop</button>
+                <button id="recropBtn" class="btn-secondary canvas-corner-btn hidden" aria-label="Re-crop photo">
+                    <img src="images/icons/crop.svg" alt="" width="18" height="18">
+                </button>
             </div>
             <div class="canvas-wrapper" data-panel="simplified" data-order="1">
                 <h3>Simplified</h3>
+                <img src="images/icons/adjustment.svg" class="canvas-panel-icon" alt="" aria-hidden="true" width="18" height="18">
                 <div class="paint-tools" id="paintTools">
                     <div class="paint-mode-toggle" role="radiogroup" aria-label="Brush tool">
                         <input type="radio" name="paintMode" id="paintModeBtn" value="paint" checked>
-                        <label class="paint-mode-option" for="paintModeBtn">Paint</label>
+                        <label class="paint-mode-option" for="paintModeBtn">
+                            <img src="images/icons/brush.svg" alt="Paint" width="16" height="16">
+                        </label>
                         <input type="radio" name="paintMode" id="eraseModeBtn" value="erase">
-                        <label class="paint-mode-option" for="eraseModeBtn">Erase</label>
+                        <label class="paint-mode-option" for="eraseModeBtn">
+                            <img src="images/icons/erase.svg" alt="Erase" width="16" height="16">
+                        </label>
                     </div>
                     <label class="paint-color-control" for="paintColorSelect">
                         <span>Paint color</span>
