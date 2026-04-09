@@ -198,12 +198,12 @@
     </main>
 
     <template id="tpl-swatch-fabric">
-        <li class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
-            <div class="color-box" style="background-color: {{FABRIC_HEX}}">
+        <li class="color-swatch{{BACKGROUND_CLASS}}" data-color-index="{{COLOR_INDEX}}">
+            <button type="button" class="color-chip-button color-box" style="background-color: {{FABRIC_HEX}}" aria-label="Change Kona color for {{FABRIC_NAME}}">
                 <span class="swatch-edit-icon" aria-hidden="true">
                     <img src="images/icons/crayons-draw-colors.svg" alt="" width="12" height="12">
                 </span>
-            </div>
+            </button>
             <div class="color-info">
                 <div class="fabric-name-row">
                     <div class="fabric-name">{{FABRIC_NAME}}</div>
@@ -226,7 +226,7 @@
     </template>
 
     <template id="tpl-swatch-raw">
-        <li class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+        <li class="color-swatch{{BACKGROUND_CLASS}}" data-color-index="{{COLOR_INDEX}}">
             <div class="color-box" style="background-color: {{HEX}}"></div>
             <div class="color-info">
                 <div class="fabric-name-row">

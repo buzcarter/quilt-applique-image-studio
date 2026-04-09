@@ -50,24 +50,19 @@ export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight
             : `${color.percentage}% · ${_formatPieces(color.pieceCount)}`,
         });
 
+    const swatchButton = swatch.querySelector('.color-chip-button');
+
     if (!color.isBackground) {
       swatch.addEventListener('mouseenter', () => onHighlight(color.colorIndex));
       swatch.addEventListener('mouseleave', () => onUnhighlight());
-      swatch.addEventListener('focus',      () => onHighlight(color.colorIndex));
-      swatch.addEventListener('blur',       () => onUnhighlight());
+      if (swatchButton) {
+        swatchButton.addEventListener('focus', () => onHighlight(color.colorIndex));
+        swatchButton.addEventListener('blur', () => onUnhighlight());
+      }
     }
 
-    if (color.fabric && typeof onChangeFabric === 'function') {
-      swatch.setAttribute('role', 'button');
-      swatch.setAttribute('aria-label', `Change Kona color for ${color.fabric.name}`);
-
-      swatch.addEventListener('click', () => {
-        onChangeFabric(color.colorIndex);
-      });
-
-      swatch.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
+    if (swatchButton && color.fabric && typeof onChangeFabric === 'function') {
+      swatchButton.addEventListener('click', () => {
         onChangeFabric(color.colorIndex);
       });
     }

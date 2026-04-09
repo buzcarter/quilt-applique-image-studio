@@ -624,17 +624,27 @@ canvas {
   border-radius: 6px;
   border: 1px solid #e0e0e0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.color-swatch[role="button"] {
-  cursor: pointer;
+  list-style: none;
 }
 
 .color-swatch:hover,
-.color-swatch:focus {
+.color-swatch:focus-within {
   border-color: #2c5f4f;
   box-shadow: 0 0 0 2px rgba(44, 95, 79, 0.15);
   outline: none;
+}
+
+.color-chip-button {
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.color-chip-button:focus-visible {
+  outline: 2px solid #2c5f4f;
+  outline-offset: 2px;
 }
 
 .color-box {
