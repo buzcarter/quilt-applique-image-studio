@@ -30,6 +30,7 @@ let currentTotalPieces = 0;
 let currentPatternRender = null;
 let currentPatternSvgMarkup = '';
 let currentSimplifiedResult = null; // cached quantization; only cleared by crop/size/color changes
+let paintPaletteOptions = [];
 
 function chooseBackgroundColorIndex(palette) {
   if (!palette || palette.length === 0) return null;
@@ -90,7 +91,8 @@ const paintColorChip = document.getElementById('paintColorChip');
 const paintState = {
   mode: 'paint',
   brushSize: 18,
-  color: '#2c5f4f',
+  colorHex: '#2c5f4f',
+  colorIndex: null,
   isDrawing: false,
   lastPoint: null,
 };
@@ -361,7 +363,7 @@ function setupPaintTools() {
 
   clearOverlayBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    clearPaintOverlay();
+    clearPaintOverlay(true);
   });
 
   brushSize.addEventListener('input', (event) => {
@@ -372,8 +374,7 @@ function setupPaintTools() {
 
   paintColorSelect.addEventListener('change', (event) => {
     event.stopPropagation();
-    paintState.color = paintColorSelect.value || paintState.color;
-    updatePaintColorChip();
+    applySelectedPaintColor();
   });
 
   for (const element of [paintModeBtn, eraseModeBtn, clearOverlayBtn, brushSize, paintColorSelect]) {
@@ -398,30 +399,47 @@ function updateBrushSizeLabel() {
 }
 
 function updatePaintColorChip() {
-  paintColorChip.style.backgroundColor = paintState.color;
+  paintColorChip.style.backgroundColor = paintState.colorHex;
 }
 
 function refreshPaintColorOptions(palette) {
-  const previousValue = paintColorSelect.value || paintState.color;
+  const previousValue = paintColorSelect.value;
   paintColorSelect.innerHTML = '';
 
-  const options = palette.length > 0 ? palette : [{ hex: '#2c5f4f', fabric: { name: 'Default Green' } }];
-  for (const entry of options) {
+  paintPaletteOptions = (palette && palette.length > 0)
+    ? palette.map((entry) => ({
+        colorIndex: entry.colorIndex,
+        overlayHex: entry.hex,
+        label: entry.fabric?.name || entry.hex,
+      }))
+    : [{ colorIndex: 0, overlayHex: '#2c5f4f', label: 'Default Green' }];
+
+  for (const entry of paintPaletteOptions) {
     const option = document.createElement('option');
-    option.value = entry.fabric?.hex || entry.hex;
-    option.textContent = entry.fabric?.name || entry.hex;
+    option.value = String(entry.colorIndex);
+    option.textContent = entry.label;
     paintColorSelect.appendChild(option);
   }
 
-  const hasPrevious = options.some((entry) => (entry.fabric?.hex || entry.hex) === previousValue);
-  paintColorSelect.value = hasPrevious ? previousValue : (options[0].fabric?.hex || options[0].hex);
-  paintState.color = paintColorSelect.value;
+  const hasPrevious = paintPaletteOptions.some((entry) => String(entry.colorIndex) === previousValue);
+  paintColorSelect.value = hasPrevious ? previousValue : String(paintPaletteOptions[0].colorIndex);
+  applySelectedPaintColor();
+}
+
+function applySelectedPaintColor() {
+  const selected = paintPaletteOptions.find((entry) => String(entry.colorIndex) === paintColorSelect.value) || paintPaletteOptions[0];
+  paintState.colorIndex = selected.colorIndex;
+  paintState.colorHex = selected.overlayHex;
   updatePaintColorChip();
 }
 
-function clearPaintOverlay() {
+function clearPaintOverlay(refreshPattern = false) {
   const ctx = paintOverlayCanvas.getContext('2d');
   ctx.clearRect(0, 0, paintOverlayCanvas.width, paintOverlayCanvas.height);
+
+  if (refreshPattern && currentSimplifiedResult) {
+    processPattern();
+  }
 }
 
 function syncPaintOverlayCanvas(width, height) {
@@ -466,7 +484,7 @@ function drawOverlaySegment(fromPoint, toPoint) {
     ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
   } else {
     ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = paintState.color;
+    ctx.strokeStyle = paintState.colorHex;
   }
 
   ctx.beginPath();
@@ -507,6 +525,117 @@ function endOverlayStroke(event) {
   if (paintOverlayCanvas.hasPointerCapture(event.pointerId)) {
     paintOverlayCanvas.releasePointerCapture(event.pointerId);
   }
+
+  if (currentSimplifiedResult) {
+    processPattern();
+  }
+}
+
+function parseHexToRgb(hex) {
+  const normalized = String(hex || '').replace('#', '');
+  if (normalized.length !== 6) return [44, 95, 79];
+  return [
+    parseInt(normalized.slice(0, 2), 16),
+    parseInt(normalized.slice(2, 4), 16),
+    parseInt(normalized.slice(4, 6), 16),
+  ];
+}
+
+function getNearestPaintColorIndex(red, green, blue) {
+  let bestIndex = paintPaletteOptions[0]?.colorIndex ?? 0;
+  let bestDistance = Infinity;
+
+  for (const entry of paintPaletteOptions) {
+    const [targetRed, targetGreen, targetBlue] = parseHexToRgb(entry.overlayHex);
+    const distance = ((red - targetRed) ** 2) + ((green - targetGreen) ** 2) + ((blue - targetBlue) ** 2);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = entry.colorIndex;
+    }
+  }
+
+  return bestIndex;
+}
+
+function getMergedAssignments(baseAssignments, processingW, processingH) {
+  if (!paintOverlayCanvas.width || !paintOverlayCanvas.height) {
+    return { assignments: baseAssignments, hasPaint: false };
+  }
+
+  const mergedAssignments = new Uint16Array(baseAssignments);
+  const scaledOverlayCanvas = document.createElement('canvas');
+  scaledOverlayCanvas.width = processingW;
+  scaledOverlayCanvas.height = processingH;
+  const scaledOverlayCtx = scaledOverlayCanvas.getContext('2d');
+  scaledOverlayCtx.clearRect(0, 0, processingW, processingH);
+  scaledOverlayCtx.imageSmoothingEnabled = true;
+  scaledOverlayCtx.drawImage(
+    paintOverlayCanvas,
+    0,
+    0,
+    paintOverlayCanvas.width,
+    paintOverlayCanvas.height,
+    0,
+    0,
+    processingW,
+    processingH
+  );
+
+  const overlayPixels = scaledOverlayCtx.getImageData(0, 0, processingW, processingH).data;
+  let hasPaint = false;
+
+  for (let i = 0; i < mergedAssignments.length; i++) {
+    const offset = i * 4;
+    if (overlayPixels[offset + 3] < 12) continue;
+    hasPaint = true;
+    mergedAssignments[i] = getNearestPaintColorIndex(
+      overlayPixels[offset],
+      overlayPixels[offset + 1],
+      overlayPixels[offset + 2]
+    );
+  }
+
+  return {
+    assignments: hasPaint ? mergedAssignments : baseAssignments,
+    hasPaint,
+  };
+}
+
+function buildPaletteFromAssignments(assignments, palette, matchedPalette) {
+  const totalPixels = assignments.length;
+  const colorCounts = new Map();
+
+  for (const entry of palette) {
+    colorCounts.set(entry.colorIndex, 0);
+  }
+
+  for (let i = 0; i < assignments.length; i++) {
+    colorCounts.set(assignments[i], (colorCounts.get(assignments[i]) || 0) + 1);
+  }
+
+  const updatedPalette = palette
+    .map((entry) => {
+      const pixelCount = colorCounts.get(entry.colorIndex) || 0;
+      return {
+        ...entry,
+        pixelCount,
+        percentage: ((pixelCount / totalPixels) * 100).toFixed(1),
+      };
+    })
+    .sort((a, b) => b.pixelCount - a.pixelCount);
+
+  const updatedMatchedPalette = matchedPalette
+    .map((entry) => {
+      const pixelCount = colorCounts.get(entry.colorIndex) || 0;
+      return {
+        ...entry,
+        pixelCount,
+        percentage: ((pixelCount / totalPixels) * 100).toFixed(1),
+      };
+    })
+    .sort((a, b) => b.pixelCount - a.pixelCount);
+
+  return { updatedPalette, updatedMatchedPalette };
 }
 
 // --- Processing Pipeline ---
@@ -607,18 +736,26 @@ function processQuantization() {
 function processPattern() {
   if (!currentSimplifiedResult) return;
 
-  const { assignments, processingW, processingH, palette, matchedPalette, backgroundColorIndex } =
+  const { assignments, processingW, processingH, palette, matchedPalette } =
     currentSimplifiedResult;
+
+  const mergedSource = getMergedAssignments(assignments, processingW, processingH);
+  const { updatedPalette, updatedMatchedPalette } = buildPaletteFromAssignments(
+    mergedSource.assignments,
+    palette,
+    matchedPalette
+  );
+  const backgroundColorIndex = chooseBackgroundColorIndex(updatedMatchedPalette);
 
   const curveComplexityAmt = parseInt(curveComplexity.value, 10);
   const smoothnessAmt = parseInt(smoothness.value, 10);
 
   const svgContainer = document.getElementById('svgContainer');
   const svgResult = generatePatternSVG(
-    assignments,
+    mergedSource.assignments,
     processingW,
     processingH,
-    palette,
+    updatedPalette,
     {
       backgroundColorIndex,
       curveComplexity: curveComplexityAmt,
@@ -628,7 +765,7 @@ function processPattern() {
   currentPatternSvgMarkup = svgResult.svg;
   svgContainer.innerHTML = svgResult.svg;
 
-  currentPalette = matchedPalette.map((entry) => ({
+  currentPalette = updatedMatchedPalette.map((entry) => ({
     ...entry,
     pieceCount: svgResult.pieceCounts.get(entry.colorIndex) || 0,
     isBackground: entry.colorIndex === backgroundColorIndex,
@@ -642,7 +779,7 @@ function displayPalette(palette, totalPieces) {
   document.getElementById('pieceCount').textContent = totalPieces;
   document.getElementById('patternPanelFabricCount').textContent = palette.length;
   document.getElementById('patternPanelPieceCount').textContent = totalPieces;
-  refreshPaintColorOptions(palette);
+  refreshPaintColorOptions(currentSimplifiedResult?.matchedPalette || palette);
   const container = document.getElementById('colorSwatches');
   container.innerHTML = '';
 
