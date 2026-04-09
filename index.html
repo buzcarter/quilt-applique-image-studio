@@ -7,17 +7,17 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div class="container">
+    <main class="container">
         <h1>Appliqué Studio</h1>
         <p class="subtitle">Turn photos into appliqué quilt patterns using real fabrics</p>
         <p class="fabric-status" id="fabricStatus">Loading fabric library...</p>
 
         <!-- Step 1: Upload -->
-        <div class="upload-area" id="uploadArea">
+        <section class="upload-area" id="uploadArea">
             <p style="font-size: 18px; margin-bottom: 10px;">Click or drag a photo here</p>
             <p style="color: #999; font-size: 14px;">JPEG or PNG files</p>
             <input type="file" id="fileInput" accept="image/*">
-        </div>
+        </section>
         <div class="btn-row hidden" id="cancelUploadRow">
             <button type="button" id="cancelUploadBtn" class="btn-secondary">Cancel</button>
         </div>
@@ -29,7 +29,7 @@
         </div>
 
         <!-- Step 2: Crop -->
-        <div id="cropSection" class="crop-section hidden">
+        <section id="cropSection" class="crop-section hidden">
             <h3>Crop Your Photo</h3>
             <p class="crop-hint">Drag the handles to select the area you want to turn into a pattern</p>
             <div class="crop-presets">
@@ -44,10 +44,10 @@
                 <button id="resetCropBtn" class="btn-secondary">Reset Crop</button>
                 <button id="applyCropBtn">Use This Crop</button>
             </div>
-        </div>
+        </section>
 
         <!-- Step 3: Adjust -->
-        <div id="controls" class="controls hidden">
+        <section id="controls" class="controls hidden">
             <div class="control-group">
                 <label for="quiltWidth">Quilt Width <span class="value-display" id="quiltWidthValue">36"</span></label>
                 <div class="slider-container">
@@ -106,20 +106,20 @@
                 </div>
                 <div class="control-detail">Lower values keep sharper turns. Higher values round corners into softer seams.</div>
             </div>
-        </div>
+        </section>
 
         <!-- Step 4: Preview -->
-        <div id="canvasContainer" class="canvas-container hidden">
+        <section id="canvasContainer" class="canvas-container hidden">
             <div class="panel-sidebar" id="panelSidebar"></div>
             <div class="panel-hero" id="panelHero"></div>
-            <div class="canvas-wrapper" data-panel="original" data-order="0">
+            <figure class="canvas-wrapper" data-panel="original" data-order="0">
                 <h3>Original</h3>
                 <canvas id="originalCanvas"></canvas>
                 <button id="recropBtn" class="btn-secondary canvas-corner-btn hidden" aria-label="Re-crop photo">
                     <img src="images/icons/crop.svg" alt="" width="18" height="18">
                 </button>
-            </div>
-            <div class="canvas-wrapper" data-panel="simplified" data-order="1">
+            </figure>
+            <figure class="canvas-wrapper" data-panel="simplified" data-order="1">
                 <h3>Adjustments</h3>
                 <img src="images/icons/adjustment.svg" class="canvas-panel-icon" alt="" aria-hidden="true" width="18" height="18">
                 <div class="paint-tools" id="paintTools">
@@ -156,8 +156,8 @@
                     <canvas id="paintOverlayCanvas"></canvas>
                     <div id="brushCursor" hidden></div>
                 </div>
-            </div>
-            <div class="canvas-wrapper" data-panel="pattern" data-order="2">
+            </figure>
+            <figure class="canvas-wrapper" data-panel="pattern" data-order="2">
                 <h3>Final Pattern</h3>
                 <div id="svgContainer"></div>
                 <div class="panel-stats" id="patternPanelStats">
@@ -165,19 +165,19 @@
                     <span class="panel-stats-sep">·</span>
                     <span><strong id="patternPanelPieceCount">0</strong> pieces</span>
                 </div>
-            </div>
-        </div>
+            </figure>
+        </section>
 
         <!-- Step 5: Palette -->
-        <div id="palette" class="palette hidden">
+        <section id="palette" class="palette hidden">
             <h3>Fabrics: Kona Solids, <span id="paletteCount">0</span> colors (<span id="pieceCount">0</span> pieces)</h3>
             <div id="fabricPickerOverlay" class="fabric-picker hidden" aria-hidden="true">
                 <div class="fabric-picker__backdrop" data-action="close-fabric-picker"></div>
                 <div class="fabric-picker__panel" role="dialog" aria-modal="true" aria-labelledby="fabricPickerTitle">
-                    <div class="fabric-picker__header">
+                    <header class="fabric-picker__header">
                         <h4 id="fabricPickerTitle">Choose Kona color</h4>
                         <button type="button" class="fabric-picker__close" id="fabricPickerCloseBtn" aria-label="Close color picker">×</button>
-                    </div>
+                    </header>
                     <p class="fabric-picker__hint">Pick a fabric to override the mapped Kona color for this swatch.</p>
                     <div class="fabric-picker__search-row">
                         <input type="search" id="fabricPickerSearch" class="fabric-picker__search" placeholder="Search by name, number, or hex" aria-label="Search Kona colors">
@@ -186,7 +186,7 @@
                 </div>
             </div>
             <div class="color-swatches" id="colorSwatches"></div>
-        </div>
+        </section>
 
         <!-- Actions -->
         <div class="btn-row hidden" id="actionButtons">
@@ -195,7 +195,7 @@
                 Download Pattern PDF
             </button>
         </div>
-    </div>
+    </main>
 
     <template id="tpl-swatch-fabric">
         <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
