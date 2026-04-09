@@ -215,38 +215,61 @@ function ptLineDist([px, py], ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-// --- Catmull-Rom → Cubic Bézier Smoothing ---
+// --- Path Smoothing (Taubin λ|μ + Catmull-Rom) ---
 
+/**
+ * One Laplacian relaxation pass. Each vertex moves factor × (neighbor avg − itself).
+ * Positive factor: shrinks toward centroid. Negative: expands slightly.
+ */
+function laplacianPass(pts, factor) {
+  const n = pts.length;
+  return pts.map((p, i) => {
+    const prev = pts[(i - 1 + n) % n];
+    const next = pts[(i + 1) % n];
+    return [
+      p[0] + factor * ((prev[0] + next[0]) / 2 - p[0]),
+      p[1] + factor * ((prev[1] + next[1]) / 2 - p[1]),
+    ];
+  });
+}
+
+/**
+ * Taubin λ|μ smoothing: alternates a shrinking pass (λ) and a slight
+ * expanding pass (μ) so the shape rounds without contracting to a point.
+ * After enough iterations a convex polygon converges to a circle.
+ */
+function taubinSmooth(pts, iterations) {
+  const LAMBDA = 0.5;
+  const MU = -0.53; // |μ| > λ to resist shrinkage
+  let current = pts;
+  for (let i = 0; i < iterations; i++) {
+    current = laplacianPass(current, LAMBDA);
+    current = laplacianPass(current, MU);
+  }
+  return current;
+}
+
+/**
+ * Convert a point array to a closed straight-line polygon SVG path.
+ * Used as the t≈0 fallback.
+ */
 function polygonToSVGPath(pts) {
   const f = (v) => +v.toFixed(2);
   let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
-
   for (let i = 1; i < pts.length; i++) {
     d += `L${f(pts[i][0])} ${f(pts[i][1])}`;
   }
-
   return d + 'Z';
 }
 
-function getCornerSoftness(prev, current, next, smoothness) {
-  const inX = prev[0] - current[0];
-  const inY = prev[1] - current[1];
-  const outX = next[0] - current[0];
-  const outY = next[1] - current[1];
-  const inLength = Math.hypot(inX, inY);
-  const outLength = Math.hypot(outX, outY);
-
-  if (inLength === 0 || outLength === 0) {
-    return 0;
-  }
-
-  const dot = ((inX * outX) + (inY * outY)) / (inLength * outLength);
-  const clampedDot = Math.max(-1, Math.min(1, dot));
-  const openness = (1 - clampedDot) / 2;
-  const minSoftness = clamp01(smoothness / 100) * 0.25;
-  return minSoftness + ((1 - minSoftness) * openness);
-}
-
+/**
+ * Convert points to a smooth closed SVG path.
+ *
+ * smoothness 0:   straight polygon, no changes.
+ * smoothness 50:  moderate Taubin rounding + gentle bezier curves.
+ * smoothness 100: maximum Taubin (22 iterations) + full Catmull-Rom tension.
+ *                 A square becomes circle-like.
+ */
 function smoothToSVGPath(pts, smoothness = 60) {
   const n = pts.length;
   if (n < 3) return '';
@@ -256,23 +279,27 @@ function smoothToSVGPath(pts, smoothness = 60) {
     return polygonToSVGPath(pts);
   }
 
+  // Taubin iterations: quadratic ramp so high end is strongly rounded.
+  const iterations = Math.round(t * t * 22);
+  const smoothed = iterations > 0 ? taubinSmooth(pts, iterations) : pts;
+
+  // Catmull-Rom tension: 0 (straight) → 1/6 (standard full tension).
+  const tension = t / 6;
+
   const f = (v) => +v.toFixed(2);
-  const handleScale = 0.04 + (t * 0.13);
-  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  const m = smoothed.length;
+  let d = `M${f(smoothed[0][0])} ${f(smoothed[0][1])}`;
 
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n];
-    const p1 = pts[i];
-    const p2 = pts[(i + 1) % n];
-    const p3 = pts[(i + 2) % n];
-    const cornerSoftness1 = getCornerSoftness(p0, p1, p2, smoothness);
-    const cornerSoftness2 = getCornerSoftness(p1, p2, p3, smoothness);
+  for (let i = 0; i < m; i++) {
+    const p0 = smoothed[(i - 1 + m) % m];
+    const p1 = smoothed[i];
+    const p2 = smoothed[(i + 1) % m];
+    const p3 = smoothed[(i + 2) % m];
 
-    // Catmull-Rom to cubic bézier control points
-    const cp1x = p1[0] + ((p2[0] - p0[0]) * handleScale * cornerSoftness1);
-    const cp1y = p1[1] + ((p2[1] - p0[1]) * handleScale * cornerSoftness1);
-    const cp2x = p2[0] - ((p3[0] - p1[0]) * handleScale * cornerSoftness2);
-    const cp2y = p2[1] - ((p3[1] - p1[1]) * handleScale * cornerSoftness2);
+    const cp1x = p1[0] + (p2[0] - p0[0]) * tension;
+    const cp1y = p1[1] + (p2[1] - p0[1]) * tension;
+    const cp2x = p2[0] - (p3[0] - p1[0]) * tension;
+    const cp2y = p2[1] - (p3[1] - p1[1]) * tension;
 
     d += `C${f(cp1x)} ${f(cp1y)},${f(cp2x)} ${f(cp2y)},${f(p2[0])} ${f(p2[1])}`;
   }

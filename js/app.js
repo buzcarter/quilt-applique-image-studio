@@ -318,8 +318,8 @@ function processImage() {
   const numColors = parseInt(colorSlider.value);
   const widthInches = parseInt(quiltWidth.value);
   const pieceSize = parseFloat(minPieceSize.value);
-  const curveComplexityValue = parseInt(curveComplexity.value, 10);
-  const smoothnessValue = parseInt(smoothness.value, 10);
+  const curveComplexityAmt = parseInt(curveComplexity.value, 10);
+  const smoothnessAmt = parseInt(smoothness.value, 10);
 
   // Step 1: Extract cropped region
   const srcCanvas = document.createElement('canvas');
@@ -391,8 +391,8 @@ function processImage() {
     simplified.palette,
     {
       backgroundColorIndex,
-      curveComplexity: curveComplexityValue,
-      smoothness: smoothnessValue,
+      curveComplexity: curveComplexityAmt,
+      smoothness: smoothnessAmt,
     }
   );
   currentPatternSvgMarkup = svgResult.svg;
