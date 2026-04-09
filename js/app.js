@@ -25,6 +25,8 @@ let originalDataUrl = null;
 let cropTool = null;
 let currentCrop = null;
 let currentPalette = [];
+let currentTotalPieces = 0;
+let currentPatternRender = null;
 
 // DOM refs
 const uploadArea = document.getElementById('uploadArea');
@@ -294,26 +296,47 @@ function processImage() {
   processedCanvas.height = processingH;
   processedCanvas.getContext('2d').putImageData(simplified.imageData, 0, 0);
 
-  patternCanvas.width = displayW;
-  patternCanvas.height = displayH;
-  const patternCtx = patternCanvas.getContext('2d');
-  patternCtx.imageSmoothingEnabled = true;
-  patternCtx.clearRect(0, 0, displayW, displayH);
-  patternCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
+  currentPatternRender = {
+    processedCanvas,
+    assignments: simplified.assignments,
+    processingW,
+    processingH,
+    displayW,
+    displayH,
+    maskCache: new Map(),
+  };
+  renderPatternPreview(null);
 
   // Step 6: Match to fabrics and display
   currentPalette = matchPaletteToFabrics(simplified.palette);
-  displayPalette(currentPalette);
+  currentTotalPieces = simplified.totalPieces;
+  displayPalette(currentPalette, currentTotalPieces);
 }
 
-function displayPalette(palette) {
+function displayPalette(palette, totalPieces) {
   document.getElementById('paletteCount').textContent = palette.length;
+  document.getElementById('pieceCount').textContent = totalPieces;
   const container = document.getElementById('colorSwatches');
   container.innerHTML = '';
 
   for (const color of palette) {
     const swatch = document.createElement('div');
     swatch.className = 'color-swatch';
+    swatch.tabIndex = 0;
+    swatch.dataset.colorIndex = String(color.colorIndex);
+
+    swatch.addEventListener('mouseenter', () => {
+      renderPatternPreview(color.colorIndex);
+    });
+    swatch.addEventListener('mouseleave', () => {
+      renderPatternPreview(null);
+    });
+    swatch.addEventListener('focus', () => {
+      renderPatternPreview(color.colorIndex);
+    });
+    swatch.addEventListener('blur', () => {
+      renderPatternPreview(null);
+    });
 
     if (color.fabric) {
       swatch.innerHTML = `
@@ -324,6 +347,8 @@ function displayPalette(palette) {
             <span class="fabric-number">${color.fabric.number}</span>
             <span class="fabric-sep">·</span>
             <span class="color-percent">${color.percentage}%</span>
+            <span class="fabric-sep">·</span>
+            <span class="color-pieces">${formatPieceCount(color.pieceCount)}</span>
           </div>
           <div class="fabric-match-bar">
             <span class="match-swatch" style="background-color: ${color.hex}" title="Image color ${color.hex}"></span>
@@ -338,13 +363,80 @@ function displayPalette(palette) {
         <div class="color-box" style="background-color: ${color.hex}"></div>
         <div class="color-info">
           <div class="color-hex">${color.hex}</div>
-          <div class="color-percent">${color.percentage}%</div>
+          <div class="color-percent">${color.percentage}% · ${formatPieceCount(color.pieceCount)}</div>
         </div>
       `;
     }
 
     container.appendChild(swatch);
   }
+}
+
+function formatPieceCount(pieceCount) {
+  return `${pieceCount} ${pieceCount === 1 ? 'piece' : 'pieces'}`;
+}
+
+function renderPatternPreview(activeColorIndex) {
+  if (!currentPatternRender) return;
+
+  const { processedCanvas, processingW, processingH, displayW, displayH } = currentPatternRender;
+  patternCanvas.width = displayW;
+  patternCanvas.height = displayH;
+
+  const patternCtx = patternCanvas.getContext('2d');
+  patternCtx.clearRect(0, 0, displayW, displayH);
+
+  if (activeColorIndex === null || activeColorIndex === undefined) {
+    patternCtx.imageSmoothingEnabled = true;
+    patternCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
+    return;
+  }
+
+  patternCtx.imageSmoothingEnabled = true;
+  patternCtx.filter = 'grayscale(1) contrast(0.5) brightness(1.2)';
+  patternCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
+  patternCtx.filter = 'none';
+
+  const selectedLayer = document.createElement('canvas');
+  selectedLayer.width = displayW;
+  selectedLayer.height = displayH;
+  const selectedCtx = selectedLayer.getContext('2d');
+  selectedCtx.imageSmoothingEnabled = true;
+  selectedCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
+
+  const maskCanvas = getSelectedMaskCanvas(activeColorIndex);
+  selectedCtx.globalCompositeOperation = 'destination-in';
+  selectedCtx.imageSmoothingEnabled = false;
+  selectedCtx.drawImage(maskCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
+  selectedCtx.globalCompositeOperation = 'source-over';
+
+  patternCtx.drawImage(selectedLayer, 0, 0);
+}
+
+function getSelectedMaskCanvas(colorIndex) {
+  if (currentPatternRender.maskCache.has(colorIndex)) {
+    return currentPatternRender.maskCache.get(colorIndex);
+  }
+
+  const { assignments, processingW, processingH } = currentPatternRender;
+  const maskData = new Uint8ClampedArray(assignments.length * 4);
+
+  for (let i = 0; i < assignments.length; i++) {
+    if (assignments[i] !== colorIndex) continue;
+    const off = i * 4;
+    maskData[off] = 255;
+    maskData[off + 1] = 255;
+    maskData[off + 2] = 255;
+    maskData[off + 3] = 255;
+  }
+
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = processingW;
+  maskCanvas.height = processingH;
+  maskCanvas.getContext('2d').putImageData(new ImageData(maskData, processingW, processingH), 0, 0);
+
+  currentPatternRender.maskCache.set(colorIndex, maskCanvas);
+  return maskCanvas;
 }
 
 // --- Buttons ---

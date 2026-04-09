@@ -159,7 +159,13 @@ function initCentroids(pixels, pixelLabs, k) {
 function buildQuantizedResult(assignments, width, height, centroids, centroidLabs) {
   const pixelCount = width * height;
   const colorCounts = new Uint32Array(centroids.length);
+  const pieceCounts = new Uint32Array(centroids.length);
   const outData = new Uint8ClampedArray(pixelCount * 4);
+  const regions = collectRegions(assignments, width, height);
+
+  for (const region of regions) {
+    pieceCounts[region.colorIndex]++;
+  }
 
   for (let i = 0; i < pixelCount; i++) {
     const colorIndex = assignments[i];
@@ -175,11 +181,13 @@ function buildQuantizedResult(assignments, width, height, centroids, centroidLab
 
   const palette = centroids
     .map((rgb, idx) => ({
+      colorIndex: idx,
       rgb,
       hex: rgbToHex(rgb[0], rgb[1], rgb[2]),
       lab: centroidLabs[idx],
       percentage: ((colorCounts[idx] / pixelCount) * 100).toFixed(1),
       pixelCount: colorCounts[idx],
+      pieceCount: pieceCounts[idx],
     }))
     .filter(entry => entry.pixelCount > 0)
     .sort((a, b) => b.pixelCount - a.pixelCount);
@@ -190,6 +198,7 @@ function buildQuantizedResult(assignments, width, height, centroids, centroidLab
     assignments,
     centroids,
     centroidLabs,
+    totalPieces: regions.length,
     imageData: new ImageData(outData, width, height),
     palette,
   };

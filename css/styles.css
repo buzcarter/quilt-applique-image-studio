@@ -276,6 +276,14 @@ canvas {
   background: white;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.color-swatch:hover,
+.color-swatch:focus {
+  border-color: #2c5f4f;
+  box-shadow: 0 0 0 2px rgba(44, 95, 79, 0.15);
+  outline: none;
 }
 
 .color-box {
