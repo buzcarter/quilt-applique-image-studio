@@ -10,14 +10,23 @@
  * @param {number} width - processing grid width
  * @param {number} height - processing grid height
  * @param {Array} palette - color entries with .hex, .colorIndex
- * @param {number|null} backgroundColorIndex - colorIndex used as full-bleed background
+ * @param {number|object|null} options - backgroundColorIndex or export options
  * @returns {{ svg: string, pieceCounts: Map<number, number>, totalPieces: number }}
  */
-export function generatePatternSVG(assignments, width, height, palette, backgroundColorIndex = null) {
+export function generatePatternSVG(assignments, width, height, palette, options = null) {
+  const resolvedOptions = (options !== null && typeof options === 'object')
+    ? options
+    : { backgroundColorIndex: options };
+  const {
+    backgroundColorIndex = null,
+    curveComplexity = 55,
+    smoothness = 60,
+  } = resolvedOptions;
   const allPaths = [];
   const pieceCounts = new Map();
   const backgroundEntry = palette.find((color) => color.colorIndex === backgroundColorIndex) || null;
   const backgroundFill = backgroundEntry ? backgroundEntry.hex : '#fff';
+  const simplifyTolerance = getSimplifyTolerance(curveComplexity);
 
   for (const color of palette) {
     if (color.colorIndex === backgroundColorIndex) {
@@ -29,11 +38,11 @@ export function generatePatternSVG(assignments, width, height, palette, backgrou
     let count = 0;
     for (const contour of contours) {
       if (contour.length < 4) continue;
-      const simplified = simplifyClosedPath(contour, 1.0);
+      const simplified = simplifyClosedPath(contour, simplifyTolerance);
       if (simplified.length < 3) continue;
       count++;
       allPaths.push({
-        d: smoothToSVGPath(simplified),
+        d: smoothToSVGPath(simplified, smoothness),
         fill: color.hex,
         colorIndex: color.colorIndex,
       });
@@ -54,6 +63,15 @@ export function generatePatternSVG(assignments, width, height, palette, backgrou
 
   lines.push('</svg>');
   return { svg: lines.join('\n'), pieceCounts, totalPieces: allPaths.length };
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function getSimplifyTolerance(curveComplexity) {
+  const t = clamp01(Number(curveComplexity || 0) / 100);
+  return 0.35 + ((1 - t) ** 2) * 3.15;
 }
 
 // --- Marching Squares Contour Tracing ---
@@ -199,11 +217,47 @@ function ptLineDist([px, py], ax, ay, bx, by) {
 
 // --- Catmull-Rom → Cubic Bézier Smoothing ---
 
-function smoothToSVGPath(pts) {
+function polygonToSVGPath(pts) {
+  const f = (v) => +v.toFixed(2);
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+
+  for (let i = 1; i < pts.length; i++) {
+    d += `L${f(pts[i][0])} ${f(pts[i][1])}`;
+  }
+
+  return d + 'Z';
+}
+
+function getCornerSoftness(prev, current, next, smoothness) {
+  const inX = prev[0] - current[0];
+  const inY = prev[1] - current[1];
+  const outX = next[0] - current[0];
+  const outY = next[1] - current[1];
+  const inLength = Math.hypot(inX, inY);
+  const outLength = Math.hypot(outX, outY);
+
+  if (inLength === 0 || outLength === 0) {
+    return 0;
+  }
+
+  const dot = ((inX * outX) + (inY * outY)) / (inLength * outLength);
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+  const openness = (1 - clampedDot) / 2;
+  const minSoftness = clamp01(smoothness / 100) * 0.25;
+  return minSoftness + ((1 - minSoftness) * openness);
+}
+
+function smoothToSVGPath(pts, smoothness = 60) {
   const n = pts.length;
   if (n < 3) return '';
 
+  const t = clamp01(Number(smoothness || 0) / 100);
+  if (t <= 0.01) {
+    return polygonToSVGPath(pts);
+  }
+
   const f = (v) => +v.toFixed(2);
+  const handleScale = 0.04 + (t * 0.13);
   let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
 
   for (let i = 0; i < n; i++) {
@@ -211,12 +265,14 @@ function smoothToSVGPath(pts) {
     const p1 = pts[i];
     const p2 = pts[(i + 1) % n];
     const p3 = pts[(i + 2) % n];
+    const cornerSoftness1 = getCornerSoftness(p0, p1, p2, smoothness);
+    const cornerSoftness2 = getCornerSoftness(p1, p2, p3, smoothness);
 
     // Catmull-Rom to cubic bézier control points
-    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+    const cp1x = p1[0] + ((p2[0] - p0[0]) * handleScale * cornerSoftness1);
+    const cp1y = p1[1] + ((p2[1] - p0[1]) * handleScale * cornerSoftness1);
+    const cp2x = p2[0] - ((p3[0] - p1[0]) * handleScale * cornerSoftness2);
+    const cp2y = p2[1] - ((p3[1] - p1[1]) * handleScale * cornerSoftness2);
 
     d += `C${f(cp1x)} ${f(cp1y)},${f(cp2x)} ${f(cp2y)},${f(p2[0])} ${f(p2[1])}`;
   }

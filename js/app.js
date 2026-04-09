@@ -72,6 +72,10 @@ const quiltWidthValue = document.getElementById('quiltWidthValue');
 const quiltDimensions = document.getElementById('quiltDimensions');
 const minPieceSize = document.getElementById('minPieceSize');
 const minPieceSizeValue = document.getElementById('minPieceSizeValue');
+const curveComplexity = document.getElementById('curveComplexity');
+const curveComplexityValue = document.getElementById('curveComplexityValue');
+const smoothness = document.getElementById('smoothness');
+const smoothnessValue = document.getElementById('smoothnessValue');
 const fabricStatus = document.getElementById('fabricStatus');
 
 // --- Init ---
@@ -114,6 +118,14 @@ function restoreSession() {
       minPieceSize.value = session.minPieceSize;
       minPieceSizeValue.textContent = session.minPieceSize + '"';
     }
+    if (session.curveComplexity !== undefined) {
+      curveComplexity.value = session.curveComplexity;
+      curveComplexityValue.textContent = session.curveComplexity + '%';
+    }
+    if (session.smoothness !== undefined) {
+      smoothness.value = session.smoothness;
+      smoothnessValue.textContent = session.smoothness + '%';
+    }
 
     if (session.crop) {
       currentCrop = session.crop;
@@ -133,6 +145,8 @@ function persistSession() {
     numColors: parseInt(colorSlider.value),
     quiltWidth: parseInt(quiltWidth.value),
     minPieceSize: parseFloat(minPieceSize.value),
+    curveComplexity: parseInt(curveComplexity.value),
+    smoothness: parseInt(smoothness.value),
   });
 }
 
@@ -276,6 +290,16 @@ function setupControls() {
     minPieceSizeValue.textContent = minPieceSize.value + '"';
     debounceProcess();
   });
+
+  curveComplexity.addEventListener('input', () => {
+    curveComplexityValue.textContent = curveComplexity.value + '%';
+    debounceProcess();
+  });
+
+  smoothness.addEventListener('input', () => {
+    smoothnessValue.textContent = smoothness.value + '%';
+    debounceProcess();
+  });
 }
 
 /** Show computed quilt height based on crop ratio and chosen width */
@@ -294,6 +318,8 @@ function processImage() {
   const numColors = parseInt(colorSlider.value);
   const widthInches = parseInt(quiltWidth.value);
   const pieceSize = parseFloat(minPieceSize.value);
+  const curveComplexityValue = parseInt(curveComplexity.value, 10);
+  const smoothnessValue = parseInt(smoothness.value, 10);
 
   // Step 1: Extract cropped region
   const srcCanvas = document.createElement('canvas');
@@ -363,7 +389,11 @@ function processImage() {
     processingW,
     processingH,
     simplified.palette,
-    backgroundColorIndex
+    {
+      backgroundColorIndex,
+      curveComplexity: curveComplexityValue,
+      smoothness: smoothnessValue,
+    }
   );
   currentPatternSvgMarkup = svgResult.svg;
   svgContainer.innerHTML = svgResult.svg;
