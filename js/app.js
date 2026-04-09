@@ -29,6 +29,7 @@ let currentPalette = [];
 let currentTotalPieces = 0;
 let currentPatternRender = null;
 let currentPatternSvgMarkup = '';
+let currentSimplifiedResult = null; // cached quantization; only cleared by crop/size/color changes
 
 function chooseBackgroundColorIndex(palette) {
   if (!palette || palette.length === 0) return null;
@@ -221,7 +222,7 @@ function applyCrop() {
   downloadBtn.classList.remove('hidden');
   updateQuiltDimensions();
   persistSession();
-  processImage();
+  processQuantization();
 }
 
 // --- Crop Presets ---
@@ -241,16 +242,28 @@ function setupCropPresets() {
 
 // --- Controls ---
 function setupControls() {
-  // Debounce timer for expensive reprocessing
-  let processTimer = null;
-  const debounceProcess = () => {
-    clearTimeout(processTimer);
-    processTimer = setTimeout(() => {
+  // Slow sliders: re-run full quantization pipeline (k-means + merge + SVG)
+  let quantizeTimer = null;
+  const debounceQuantize = () => {
+    clearTimeout(quantizeTimer);
+    quantizeTimer = setTimeout(() => {
       if (originalImage && currentCrop) {
-        processImage();
+        processQuantization();
         persistSession();
       }
     }, 150);
+  };
+
+  // Fast sliders: only regenerate SVG from cached assignments — deterministic
+  let patternTimer = null;
+  const debouncePattern = () => {
+    clearTimeout(patternTimer);
+    patternTimer = setTimeout(() => {
+      if (currentSimplifiedResult) {
+        processPattern();
+        persistSession();
+      }
+    }, 80);
   };
 
   const nudgeSlider = (slider, direction) => {
@@ -275,30 +288,32 @@ function setupControls() {
     });
   });
 
+  // These sliders change pixel data → must re-quantize
   quiltWidth.addEventListener('input', () => {
     quiltWidthValue.textContent = quiltWidth.value + '"';
     updateQuiltDimensions();
-    debounceProcess();
+    debounceQuantize();
   });
 
   colorSlider.addEventListener('input', () => {
     colorValue.textContent = colorSlider.value;
-    debounceProcess();
+    debounceQuantize();
   });
 
   minPieceSize.addEventListener('input', () => {
     minPieceSizeValue.textContent = minPieceSize.value + '"';
-    debounceProcess();
+    debounceQuantize();
   });
 
+  // These sliders only change SVG generation → reuse cached assignments
   curveComplexity.addEventListener('input', () => {
     curveComplexityValue.textContent = curveComplexity.value + '%';
-    debounceProcess();
+    debouncePattern();
   });
 
   smoothness.addEventListener('input', () => {
     smoothnessValue.textContent = smoothness.value + '%';
-    debounceProcess();
+    debouncePattern();
   });
 }
 
@@ -312,14 +327,19 @@ function updateQuiltDimensions() {
 }
 
 // --- Processing Pipeline ---
-function processImage() {
+
+/**
+ * Stage 1 — runs k-means quantization and region merging.
+ * Triggered by: quiltWidth, colorSlider, minPieceSize, or a new crop.
+ * Updates the Simplified canvas and caches result in currentSimplifiedResult.
+ * Always calls processPattern() afterwards.
+ */
+function processQuantization() {
   if (!originalImage || !currentCrop) return;
 
   const numColors = parseInt(colorSlider.value);
   const widthInches = parseInt(quiltWidth.value);
   const pieceSize = parseFloat(minPieceSize.value);
-  const curveComplexityAmt = parseInt(curveComplexity.value, 10);
-  const smoothnessAmt = parseInt(smoothness.value, 10);
 
   // Step 1: Extract cropped region
   const srcCanvas = document.createElement('canvas');
@@ -378,17 +398,44 @@ function processImage() {
   };
   renderPatternPreview(null);
 
-  // Step 5b: Resolve fabric names first so alphabetical tie-breaks are human-readable.
+  // Resolve fabric names so background tie-break uses human-readable names
   const matchedPalette = matchPaletteToFabrics(simplified.palette);
   const backgroundColorIndex = chooseBackgroundColorIndex(matchedPalette);
 
-  // Generate smooth SVG pattern (piece counts come from non-background SVG paths)
-  const svgContainer = document.getElementById('svgContainer');
-  const svgResult = generatePatternSVG(
-    simplified.assignments,
+  // Cache everything processPattern() needs
+  currentSimplifiedResult = {
+    assignments: simplified.assignments,
     processingW,
     processingH,
-    simplified.palette,
+    palette: simplified.palette,
+    matchedPalette,
+    backgroundColorIndex,
+  };
+
+  processPattern();
+}
+
+/**
+ * Stage 2 — generates the SVG Pattern from cached Simplified data.
+ * Triggered by: curveComplexity, smoothness (or after processQuantization).
+ * Pure and deterministic: same inputs always produce the same SVG.
+ * Does NOT touch the Simplified canvas or re-run k-means.
+ */
+function processPattern() {
+  if (!currentSimplifiedResult) return;
+
+  const { assignments, processingW, processingH, palette, matchedPalette, backgroundColorIndex } =
+    currentSimplifiedResult;
+
+  const curveComplexityAmt = parseInt(curveComplexity.value, 10);
+  const smoothnessAmt = parseInt(smoothness.value, 10);
+
+  const svgContainer = document.getElementById('svgContainer');
+  const svgResult = generatePatternSVG(
+    assignments,
+    processingW,
+    processingH,
+    palette,
     {
       backgroundColorIndex,
       curveComplexity: curveComplexityAmt,
@@ -398,7 +445,6 @@ function processImage() {
   currentPatternSvgMarkup = svgResult.svg;
   svgContainer.innerHTML = svgResult.svg;
 
-  // Step 6: Match to fabrics and display
   currentPalette = matchedPalette.map((entry) => ({
     ...entry,
     pieceCount: svgResult.pieceCounts.get(entry.colorIndex) || 0,
