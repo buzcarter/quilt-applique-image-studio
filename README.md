@@ -15,12 +15,13 @@ Upload a photo, pick a fabric line, adjust a few sliders, and get a pattern with
 **Target audience:** Non-technical quilt guild members working from iPhone photos.
 ## How It Works
 
-Appliqué Studio turns your photo into a quilt pattern in 4 simple steps:
+Appliqué Studio turns your photo into a quilt pattern in 5 simple steps:
 
 1. **Choose Your Photo** — Upload or capture a photo you love
 2. **Frame Your Design** — Crop the area you want, pick your final size (width in inches)
-3. **Pick Your Complexity** — Adjust how many fabrics and how detailed the shapes should be
-4. **Get Your Pattern** — Preview your design and download a shopping list of real fabrics to order
+3. **Build Simplified Base** — Set Number of Fabrics and Smallest Piece to create a clean base map
+4. **Shape The Pattern** — Adjust Curve Complexity and Smoothness, and optionally Paint/Erase cleanup areas
+5. **Get Your Pattern** — Preview the vector pattern and download a PDF with real fabrics to order
 
 ## The Art of Simplification
 
@@ -30,8 +31,9 @@ Your quilt won't look pixelated or blocky. Instead, it looks like a **stylized m
 - Small noise and stray pixels are cleaned up automatically
 - Shapes follow your photo's contours naturally—rounded, curved, with organic edges
 - Tiny details merge into larger shapes for simpler cutting
+- Optional paint cleanup can manually flatten busy spots directly on the Simplified map
 
-**Your control:** The "Complexity" slider adjusts how much detail remains. Lower = simpler patterns (faster cutting), Higher = more contoured shapes (more realistic to the original).
+**Your control:** Number of Fabrics + Smallest Piece define the Simplified map. Curve Complexity + Smoothness only affect vector seam shaping on top of that map.
 
 ## Who This Is For
 
@@ -51,68 +53,42 @@ This means:
 - When in doubt, **constrain** rather than expose options.
 - A hidden dev/advanced mode is fine for development and power users, but the default experience is quilter-first.
 
-## Current State (v0.2 — Phase 1 Complete)
+## Current Product Status (April 2026)
 
-- Modular ES module architecture (color-science, image-processing, fabric-matcher, crop-tool, pdf-export)
-- Interactive crop tool (first step after upload, original retained for re-cropping)
-- K-means quantization with CIELAB Delta-E perceptual color matching
-- Colors mapped to nearest Kona Cotton Solid (fabric name, SKU, swatch)
-- 6-20 fabric range, side-by-side preview, PDF export with fabric shopping list
+### Implemented
 
-## Roadmap
+- Crop-first workflow with re-crop support
+- Deterministic two-stage processing pipeline:
+	- Simplified stage: Number of Fabrics, Quilt Width, Smallest Piece
+	- Pattern stage: Curve Complexity, Smoothness
+- Region merging for minimum piece size cleanup
+- Automatic background assignment:
+	- Highest pixel-share color becomes Background
+	- Tie-break is alphabetical fabric name
+	- Background is rendered as one full-size base layer, never as pieces
+- Fabric matching to Kona Cotton Solids using CIELAB Delta-E
+- Pattern vector generation from traced contours with simplification and smoothing
+- Paint and Erase tools on Simplified with brush size and swatch-driven paint color
+- Paint overlay merge into source assignments before Pattern generation:
+	- Painted pixels replace Simplified source pixels
+	- Erased pixels reveal underlying Simplified source
+- Pattern and shopping list piece counts with background labeling
+- Vector-safe PDF export (source SVG embedded through svg2pdf, not rasterized)
 
-### Phase 2 — Session Persistence + Palette Display Polish
+### Important behavior contracts
 
-- [x] Session storage: save original image, crop, settings — reload picks up where you left off
-- [x] Palette display: Kona fabric name prominent, RGB/hex and percentage smaller beneath
-- [ ] Brightness / contrast sliders
-- [ ] "Warmer / Cooler" color temperature slider
-- [ ] "More reds / fewer reds", "More blues / fewer blues" style tint adjusters
-- [ ] Before/after toggle or side-by-side comparison
-- [ ] All labels in plain language (no jargon like "saturation" or "hue shift")
+- Moving Smoothness or Curve Complexity does not re-run k-means.
+- Moving Number of Fabrics, Smallest Piece, Quilt Width, or changing crop re-runs quantization.
+- Background color is excluded from piece counting and path generation.
+- Pattern SVG paths are fill-only (no path strokes).
 
-### Phase 3 — Region Simplification (Core Problem)
+## Next Priorities
 
-The pattern currently looks pixelated. Appliqué patterns need large, contiguous regions — not grids of tiny squares. This phase is about going from posterization to actual cuttable shapes.
-
-- [ ] Connected-component analysis: identify and count distinct "islands" per fabric color
-- [ ] Display piece count per fabric (e.g., "Ocean Blue — 3 pieces, 12% of pattern")
-- [ ] Minimum region size slider: merge tiny islands into neighboring regions
-- [ ] Edge smoothing / contour simplification (reduce jagged boundaries)
-- [ ] Total piece count display (key metric: fewer pieces = more practical quilt)
-
-### Phase 4 — Fabric Palette Management
-
-- [ ] Lock a color to a specific region (hold until architecture reveals itself)
-- [ ] Let user set a custom color palette (pick N fabrics from the library)
-- [ ] Swap a matched fabric for a different one manually
-- [ ] Add Paintbrush Studio Grunge solids as a second fabric line
-- [ ] Fabric line selector dropdown
-
-### Phase 5 — Export & Vector Output
-
-The end goal is SVG output — actual vector paths for each fabric region, not raster images.
-
-- [ ] SVG export (vector paths per fabric region — the real deliverable)
-- [ ] Improved PDF layout with fabric names, SKUs, and yardage estimates
-- [ ] PNG export of pattern only
-- [ ] Save/load project state (JSON)
-
-### Accessibility & Theming
-
-- [ ] Light / Dark / High Contrast color schemes (easily accessible toggle — older audience)
-- [ ] Migrate CSS to BEM naming convention
-- [ ] Large touch targets, readable font sizes throughout
-- [ ] Keyboard navigation for all controls
-
-### Future Ideas
-
-- **Simplify brush:** paint over busy areas (shirts, grass, hair) to flatten them into a single fabric color
-- Additional fabric libraries (Moda Bella Solids, FreeSpirit, etc.)
-- Pattern templates / aspect ratio presets (wall hanging, lap quilt, throw)
-- Numbered regions on pattern (like paint-by-numbers, but for fabric)
-- Rotate before processing
-- Community palette sharing
+- Save/load editable paint overlay in session/project state
+- Add explicit SVG export file download (in addition to PDF embedding)
+- Add alternate fabric libraries and a fabric-line picker
+- Continue CSS refactor toward BEM + theme tokens
+- Break `js/app.js` into smaller modules to keep concerns isolated
 
 ## Tech Stack
 

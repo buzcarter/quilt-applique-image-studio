@@ -23,11 +23,23 @@ Served as a static site via Apache vhost: `http://applique-studio.log/`
 3. **COLOR QUANTIZATION** — reduce to N fabric colors (4–30) using k-means in CIELAB space.
 4. **REGION MERGING** — connected-component analysis to absorb isolated regions smaller than minimum threshold into adjacent regions
 5. **FABRIC MATCHING** — map quantized colors to nearest Kona Cotton Solid via Delta-E.
-6. **DISPLAY** — pattern preview + fabric shopping list.
+6. **SIMPLIFIED DISPLAY** — render simplified bitmap preview for user validation and paint/erase edits.
+7. **PAINT MERGE (OPTIONAL)** — merge overlay paint into the simplified assignment map. Painted pixels replace simplified source pixels.
+8. **PATTERN VECTORIZE** — generate SVG paths from merged assignments using contour tracing + simplification + smoothing.
+9. **DISPLAY** — pattern preview + fabric shopping list.
 
-### Future pipeline steps (not yet implemented):
-7. **EDGE SMOOTHING** — contour simplification for organic cuttable shapes.
-8. **SVG OUTPUT** — vector paths per fabric region. This is the real deliverable: smooth curves, not pixels.
+### Pipeline split contract (must preserve)
+
+- **Stage A (re-quantize):** Crop / Quilt Width / Number of Fabrics / Smallest Piece.
+- **Stage B (re-vectorize only):** Curve Complexity / Smoothness / Paint / Erase.
+- Stage B must not re-run k-means. Same Stage A input + same Stage B settings must produce deterministic output.
+
+### Background color contract (must preserve)
+
+- Background is the highest pixel-share color.
+- Tie-break: alphabetical fabric name.
+- Background is rendered as one full-coverage base layer.
+- Background never creates path pieces and is excluded from piece counts.
 
 ## Organic Simplification Philosophy
 
@@ -54,15 +66,24 @@ This is NOT a general-purpose image editor. It has one workflow and one goal: tu
 - Fabric data lives in its own module (e.g., `fabrics/kona-solids.js`)
 - Color matching uses perceptual distance (CIELAB Delta-E), not raw RGB Euclidean distance
 - Typical quilt uses 6-20 distinct fabrics
+- Paint tool color options are sourced from current swatches/palette entries, not arbitrary free color picking
 
 ## CSS Conventions
 
 - Use BEM naming convention (`.block__element--modifier`) as we refactor
 - Plan for Light / Dark / High Contrast themes via CSS custom properties
 - Target audience is older — large touch targets, readable font sizes
+- Paint/Eraser controls should remain compact, clear, and touch-friendly; mutually exclusive mode selection is preferred
 
 ## Code Style
 
 - Vanilla JS, ES modules (may adopt TypeScript + bundler as complexity grows)
 - Descriptive variable/function names
 - Comments only where logic is non-obvious
+- Keep `js/app.js` from growing further; split into focused modules when adding substantial features
+
+## Export Rules
+
+- PDF export must stay vector-safe (embed source SVG with svg2pdf), never rasterize the pattern.
+- Strip transient UI classes/state before export so hover/selection states never leak into output.
+- Preserve quilt dimension labeling and fabric list in export output.
