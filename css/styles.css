@@ -195,6 +195,10 @@ label {
   outline-offset: 1px;
 }
 
+.slider-step-btn img {
+  vertical-align: middle;
+}
+
 .slider-min,
 .slider-max {
   font-size: 10px;
@@ -777,7 +781,23 @@ button:disabled {
   margin-top: 15px;
 }
 
+#newProjectBtn,
+#downloadBtn {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#newProjectBtn img,
+#downloadBtn img {
+  filter: brightness(0) invert(1);
+  display: block;
+  flex-shrink: 0;
+}
+
 .new-project-area button {
+  display: block;
   width: 100%;
 }
 
