@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appliqué Studio</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Appliqué Studio</h1>
+        <p class="subtitle">Turn photos into appliqué quilt patterns using real fabrics</p>
+        <p class="fabric-status" id="fabricStatus">Loading fabric library...</p>
+
+        <!-- Step 1: Upload -->
+        <div class="upload-area" id="uploadArea">
+            <p style="font-size: 18px; margin-bottom: 10px;">Click or drag a photo here</p>
+            <p style="color: #999; font-size: 14px;">JPEG or PNG files</p>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <!-- Step 2: Crop -->
+        <div id="cropSection" class="crop-section hidden">
+            <h3>Crop Your Photo</h3>
+            <p class="crop-hint">Drag the handles to select the area you want to turn into a pattern</p>
+            <div class="crop-presets">
+                <label>Shape:</label>
+                <button class="crop-preset-btn active" data-ratio="free">Free</button>
+                <button class="crop-preset-btn" data-ratio="1:1">Square</button>
+            </div>
+            <div class="crop-canvas-wrapper">
+                <canvas id="cropCanvas"></canvas>
+            </div>
+            <div class="crop-buttons">
+                <button id="resetCropBtn" class="btn-secondary">Reset Crop</button>
+                <button id="applyCropBtn">Use This Crop</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Adjust -->
+        <div id="controls" class="controls hidden">
+            <div class="control-group">
+                <label for="quiltWidth">Quilt Width <span class="value-display" id="quiltWidthValue">36"</span></label>
+                <div class="slider-container">
+                    <span class="slider-min">10"</span>
+                    <button type="button" class="slider-step-btn" data-target="quiltWidth" data-direction="-1" aria-label="Decrease quilt width">&lt;</button>
+                    <input type="range" id="quiltWidth" min="10" max="80" value="36" step="1">
+                    <button type="button" class="slider-step-btn" data-target="quiltWidth" data-direction="1" aria-label="Increase quilt width">&gt;</button>
+                    <span class="slider-max">80"</span>
+                </div>
+                <div class="control-detail" id="quiltDimensions"></div>
+            </div>
+
+            <div class="control-group">
+                <label for="colorSlider">Number of Fabrics <span class="value-display" id="colorValue">10</span></label>
+                <div class="slider-container">
+                    <span class="slider-min">2</span>
+                    <button type="button" class="slider-step-btn" data-target="colorSlider" data-direction="-1" aria-label="Decrease number of fabrics">&lt;</button>
+                    <input type="range" id="colorSlider" min="2" max="30" value="10" step="1">
+                    <button type="button" class="slider-step-btn" data-target="colorSlider" data-direction="1" aria-label="Increase number of fabrics">&gt;</button>
+                    <span class="slider-max">30</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="minPieceSize">Smallest Piece <span class="value-display" id="minPieceSizeValue">2"</span></label>
+                <div class="slider-container">
+                    <span class="slider-min">½"</span>
+                    <button type="button" class="slider-step-btn" data-target="minPieceSize" data-direction="-1" aria-label="Decrease smallest piece">&lt;</button>
+                    <input type="range" id="minPieceSize" min="0.5" max="14" value="2" step="0.5">
+                    <button type="button" class="slider-step-btn" data-target="minPieceSize" data-direction="1" aria-label="Increase smallest piece">&gt;</button>
+                    <span class="slider-max">14"</span>
+                </div>
+                <div class="control-detail">Smaller pieces keep more contour detail. Larger pieces merge stray fragments into simpler shapes.</div>
+            </div>
+
+            <div class="control-group">
+                <label for="curveComplexity">Curve Complexity <span class="value-display" id="curveComplexityValue">55%</span></label>
+                <div class="slider-container">
+                    <span class="slider-min">Min</span>
+                    <button type="button" class="slider-step-btn" data-target="curveComplexity" data-direction="-1" aria-label="Decrease curve complexity">&lt;</button>
+                    <input type="range" id="curveComplexity" min="0" max="100" value="55" step="1">
+                    <button type="button" class="slider-step-btn" data-target="curveComplexity" data-direction="1" aria-label="Increase curve complexity">&gt;</button>
+                    <span class="slider-max">Max</span>
+                </div>
+                <div class="control-detail">Lower values reduce anchor points for simpler shapes. Higher values keep more contour detail.</div>
+            </div>
+
+            <div class="control-group">
+                <label for="smoothness">Smoothness <span class="value-display" id="smoothnessValue">60%</span></label>
+                <div class="slider-container">
+                    <span class="slider-min">Min</span>
+                    <button type="button" class="slider-step-btn" data-target="smoothness" data-direction="-1" aria-label="Decrease smoothness">&lt;</button>
+                    <input type="range" id="smoothness" min="0" max="100" value="60" step="1">
+                    <button type="button" class="slider-step-btn" data-target="smoothness" data-direction="1" aria-label="Increase smoothness">&gt;</button>
+                    <span class="slider-max">Max</span>
+                </div>
+                <div class="control-detail">Lower values keep sharper turns. Higher values round corners into softer seams.</div>
+            </div>
+        </div>
+
+        <!-- Step 4: Preview -->
+        <div id="canvasContainer" class="canvas-container hidden">
+            <div class="panel-sidebar" id="panelSidebar"></div>
+            <div class="panel-hero" id="panelHero"></div>
+            <div class="canvas-wrapper" data-panel="original" data-order="0">
+                <h3>Original</h3>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper" data-panel="simplified" data-order="1">
+                <h3>Simplified</h3>
+                <div class="paint-tools" id="paintTools">
+                    <div class="paint-mode-toggle" role="radiogroup" aria-label="Brush tool">
+                        <input type="radio" name="paintMode" id="paintModeBtn" value="paint" checked>
+                        <label class="paint-mode-option" for="paintModeBtn">Paint</label>
+                        <input type="radio" name="paintMode" id="eraseModeBtn" value="erase">
+                        <label class="paint-mode-option" for="eraseModeBtn">Erase</label>
+                    </div>
+                    <label class="paint-color-control" for="paintColorSelect">
+                        <span>Paint color</span>
+                        <span class="paint-color-chip" id="paintColorChip" aria-hidden="true"></span>
+                        <select id="paintColorSelect"></select>
+                    </label>
+                    <label class="paint-brush-control" for="brushSize">
+                        <span>Brush size</span>
+                        <input type="range" id="brushSize" min="4" max="60" value="18" step="1">
+                        <span class="paint-brush-value" id="brushSizeValue">18 px</span>
+                    </label>
+                    <button type="button" class="paint-tool-btn paint-tool-btn--ghost" id="clearOverlayBtn">Clear</button>
+                </div>
+                <div class="canvas-stack simplified-stack" id="simplifiedCanvasStack">
+                    <canvas id="patternCanvas"></canvas>
+                    <canvas id="paintOverlayCanvas"></canvas>
+                    <div id="brushCursor" hidden></div>
+                </div>
+            </div>
+            <div class="canvas-wrapper" data-panel="pattern" data-order="2">
+                <h3>Pattern</h3>
+                <div id="svgContainer"></div>
+                <div class="panel-stats" id="patternPanelStats">
+                    <span><strong id="patternPanelFabricCount">0</strong> fabrics</span>
+                    <span class="panel-stats-sep">·</span>
+                    <span><strong id="patternPanelPieceCount">0</strong> pieces</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Palette -->
+        <div id="palette" class="palette hidden">
+            <h3>Fabric Shopping List (<span id="paletteCount">0</span> fabrics, <span id="pieceCount">0</span> pieces)</h3>
+            <div class="color-swatches" id="colorSwatches"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="btn-row hidden" id="actionButtons">
+            <button id="recropBtn" class="btn-secondary hidden">Re-crop Photo</button>
+            <button id="downloadBtn" class="hidden">Download Pattern PDF</button>
+        </div>
+    </div>
+
+    <template id="tpl-swatch-fabric">
+        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+            <div class="color-box" style="background-color: {{FABRIC_HEX}}"></div>
+            <div class="color-info">
+                <div class="fabric-name-row">
+                    <div class="fabric-name">{{FABRIC_NAME}}</div>
+                    {{BACKGROUND_BADGE}}
+                </div>
+                <div class="fabric-details">
+                    <span class="fabric-number">{{FABRIC_NUMBER}}</span>
+                    <span class="fabric-sep">·</span>
+                    <span class="color-percent">{{PERCENTAGE}}%</span>
+                    {{PIECE_DETAILS}}
+                </div>
+                <div class="fabric-match-bar">
+                    <span class="match-swatch" style="background-color: {{IMAGE_HEX}}" title="Image color {{IMAGE_HEX}}"></span>
+                    <span class="match-arrow">→</span>
+                    <span class="match-swatch" style="background-color: {{FABRIC_HEX}}" title="Kona {{FABRIC_NAME}} {{FABRIC_HEX}}"></span>
+                    <span class="match-delta" title="Color difference (lower = closer match)">Δ{{DELTA}}</span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-swatch-raw">
+        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+            <div class="color-box" style="background-color: {{HEX}}"></div>
+            <div class="color-info">
+                <div class="fabric-name-row">
+                    <div class="color-hex">{{HEX}}</div>
+                    {{BACKGROUND_BADGE}}
+                </div>
+                <div class="color-percent">{{PERCENTAGE_PIECES}}</div>
+            </div>
+        </div>
+    </template>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
