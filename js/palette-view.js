@@ -57,11 +57,17 @@ export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight
       swatch.addEventListener('blur',       () => onUnhighlight());
     }
 
-    const changeBtn = swatch.querySelector('[data-action="change-fabric"]');
-    if (changeBtn && typeof onChangeFabric === 'function') {
-      changeBtn.addEventListener('click', (event) => {
+    if (color.fabric && typeof onChangeFabric === 'function') {
+      swatch.setAttribute('role', 'button');
+      swatch.setAttribute('aria-label', `Change Kona color for ${color.fabric.name}`);
+
+      swatch.addEventListener('click', () => {
+        onChangeFabric(color.colorIndex);
+      });
+
+      swatch.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        event.stopPropagation();
         onChangeFabric(color.colorIndex);
       });
     }

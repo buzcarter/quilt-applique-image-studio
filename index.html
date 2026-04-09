@@ -199,7 +199,11 @@
 
     <template id="tpl-swatch-fabric">
         <li class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
-            <div class="color-box" style="background-color: {{FABRIC_HEX}}"></div>
+            <div class="color-box" style="background-color: {{FABRIC_HEX}}">
+                <span class="swatch-edit-icon" aria-hidden="true">
+                    <img src="images/icons/crayons-draw-colors.svg" alt="" width="12" height="12">
+                </span>
+            </div>
             <div class="color-info">
                 <div class="fabric-name-row">
                     <div class="fabric-name">{{FABRIC_NAME}}</div>
@@ -216,12 +220,6 @@
                     <span class="match-arrow">→</span>
                     <span class="match-swatch" style="background-color: {{FABRIC_HEX}}" title="Kona {{FABRIC_NAME}} {{FABRIC_HEX}}"></span>
                     <span class="match-delta" title="Color difference (lower = closer match)">Δ{{DELTA}}</span>
-                </div>
-                <div class="fabric-actions">
-                    <button type="button" class="swatch-change-btn" data-action="change-fabric" data-color-index="{{COLOR_INDEX}}" aria-label="Change Kona color for {{FABRIC_NAME}}">
-                        <img src="images/icons/crayons-draw-colors.svg" alt="" width="14" height="14">
-                        <span>Change</span>
-                    </button>
                 </div>
             </div>
         </li>

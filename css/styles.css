@@ -626,6 +626,10 @@ canvas {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.color-swatch[role="button"] {
+  cursor: pointer;
+}
+
 .color-swatch:hover,
 .color-swatch:focus {
   border-color: #2c5f4f;
@@ -639,6 +643,25 @@ canvas {
   border-radius: 4px;
   border: 1px solid #ccc;
   flex-shrink: 0;
+  position: relative;
+}
+
+.swatch-edit-icon {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #bfd2ca;
+  background: #f6faf8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swatch-edit-icon img {
+  display: block;
 }
 
 .color-info {
@@ -725,33 +748,6 @@ canvas {
   color: #aaa;
   font-family: monospace;
   margin-left: 2px;
-}
-
-.fabric-actions {
-  margin-top: 6px;
-}
-
-.swatch-change-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  min-height: 28px;
-  font-size: 11px;
-  border-radius: 999px;
-  border: 1px solid #9eb6ac;
-  background: transparent;
-  color: #4e665c;
-}
-
-.swatch-change-btn:hover {
-  background: #edf4f0;
-  border-color: #7fa191;
-  color: #355247;
-}
-
-.swatch-change-btn img {
-  flex-shrink: 0;
 }
 
 .fabric-picker {
