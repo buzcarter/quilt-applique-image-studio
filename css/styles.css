@@ -359,6 +359,13 @@ canvas {
   min-width: 0;
 }
 
+.fabric-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .fabric-name {
   font-weight: 700;
   font-size: 14px;
@@ -366,6 +373,27 @@ canvas {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.swatch-role-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #1f3f34;
+  background: #d8ece5;
+  border: 1px solid #9ac3b5;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.color-swatch--background {
+  border-color: #7ba696;
+  box-shadow: 0 0 0 2px rgba(123, 166, 150, 0.18);
+  background: #fbfdfc;
 }
 
 .fabric-details {

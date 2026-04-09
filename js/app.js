@@ -416,13 +416,15 @@ function displayPalette(palette, totalPieces) {
       swatch.innerHTML = `
         <div class="color-box" style="background-color: ${color.fabric.hex}"></div>
         <div class="color-info">
-          <div class="fabric-name">${color.fabric.name}</div>
+          <div class="fabric-name-row">
+            <div class="fabric-name">${color.fabric.name}</div>
+            ${color.isBackground ? '<span class="swatch-role-badge">Background</span>' : ''}
+          </div>
           <div class="fabric-details">
             <span class="fabric-number">${color.fabric.number}</span>
             <span class="fabric-sep">·</span>
             <span class="color-percent">${color.percentage}%</span>
-            <span class="fabric-sep">·</span>
-              <span class="color-pieces">${color.isBackground ? 'Background' : formatPieceCount(color.pieceCount)}</span>
+            ${color.isBackground ? '' : `<span class="fabric-sep">·</span><span class="color-pieces">${formatPieceCount(color.pieceCount)}</span>`}
           </div>
           <div class="fabric-match-bar">
             <span class="match-swatch" style="background-color: ${color.hex}" title="Image color ${color.hex}"></span>
@@ -436,8 +438,11 @@ function displayPalette(palette, totalPieces) {
       swatch.innerHTML = `
         <div class="color-box" style="background-color: ${color.hex}"></div>
         <div class="color-info">
-          <div class="color-hex">${color.hex}</div>
-          <div class="color-percent">${color.percentage}% · ${color.isBackground ? 'Background' : formatPieceCount(color.pieceCount)}</div>
+          <div class="fabric-name-row">
+            <div class="color-hex">${color.hex}</div>
+            ${color.isBackground ? '<span class="swatch-role-badge">Background</span>' : ''}
+          </div>
+          <div class="color-percent">${color.isBackground ? `${color.percentage}%` : `${color.percentage}% · ${formatPieceCount(color.pieceCount)}`}</div>
         </div>
       `;
     }

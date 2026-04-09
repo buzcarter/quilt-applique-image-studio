@@ -48,8 +48,7 @@ export function generatePatternSVG(assignments, width, height, palette, backgrou
 
   for (const p of allPaths) {
     lines.push(
-      `<path d="${p.d}" fill="${p.fill}" data-color-index="${p.colorIndex}" ` +
-      `stroke="#444" stroke-width="0.5" stroke-linejoin="round"/>`
+      `<path d="${p.d}" fill="${p.fill}" data-color-index="${p.colorIndex}"/>`
     );
   }
 
