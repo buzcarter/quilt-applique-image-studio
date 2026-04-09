@@ -457,6 +457,8 @@ function processPattern() {
 function displayPalette(palette, totalPieces) {
   document.getElementById('paletteCount').textContent = palette.length;
   document.getElementById('pieceCount').textContent = totalPieces;
+  document.getElementById('patternPanelFabricCount').textContent = palette.length;
+  document.getElementById('patternPanelPieceCount').textContent = totalPieces;
   const container = document.getElementById('colorSwatches');
   container.innerHTML = '';
 
