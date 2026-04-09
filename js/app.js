@@ -538,7 +538,7 @@ function setupButtons() {
   recropBtn.addEventListener('click', () => showCropStep());
 
   downloadBtn.addEventListener('click', () => {
-    exportPdf(patternCanvas, currentPalette);
+    exportPdf(document.getElementById('svgContainer'), currentPalette);
   });
 }
 

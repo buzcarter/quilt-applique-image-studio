@@ -1,8 +1,9 @@
 /**
- * PDF export: pattern image + fabric shopping list.
+ * PDF export: vector pattern + fabric shopping list.
+ * Uses svg2pdf.js to embed the SVG as scalable vector paths.
  */
 
-export async function exportPdf(patternCanvas, palette) {
+export async function exportPdf(svgContainer, palette) {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -15,11 +16,13 @@ export async function exportPdf(patternCanvas, palette) {
   pdf.setFont(undefined, 'bold');
   pdf.text('Appliqué Quilt Pattern', 15, 20);
 
-  // Pattern image
-  const patternDataUrl = patternCanvas.toDataURL('image/png');
+  // Embed SVG as vector paths
+  const svgEl = svgContainer.querySelector('svg');
+  const vb = svgEl.viewBox.baseVal;
   const imgWidth = 180;
-  const imgHeight = (patternCanvas.height / patternCanvas.width) * imgWidth;
-  pdf.addImage(patternDataUrl, 'PNG', 15, 30, imgWidth, imgHeight);
+  const imgHeight = (vb.height / vb.width) * imgWidth;
+
+  await pdf.svg(svgEl, { x: 15, y: 30, width: imgWidth, height: imgHeight });
 
   let yPos = 30 + imgHeight + 15;
 
