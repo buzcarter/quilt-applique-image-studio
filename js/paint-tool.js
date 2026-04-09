@@ -79,6 +79,8 @@ export function initPaintTool({ onStrokeEnd, onClear }) {
   _canvas.addEventListener('pointerleave', () => { _brushCursor.hidden = true; });
   _canvas.addEventListener('pointerup', _endStroke);
   _canvas.addEventListener('pointercancel', _endStroke);
+
+  document.addEventListener('keydown', _handleBrushSizeHotkeys);
 }
 
 /** Clears all paint from the overlay canvas without triggering callbacks. */
@@ -202,6 +204,39 @@ function _setMode(mode) {
   _state.mode = mode === 'erase' ? 'erase' : 'paint';
   _paintBtn.checked = _state.mode === 'paint';
   _eraseBtn.checked = _state.mode === 'erase';
+}
+
+function _adjustBrushSize(direction) {
+  const min = parseFloat(_sizeSlider.min || '1');
+  const max = parseFloat(_sizeSlider.max || '100');
+  const step = parseFloat(_sizeSlider.step || '1');
+  const decimals = (_sizeSlider.step.split('.')[1] || '').length;
+  const next = Math.min(max, Math.max(min, parseFloat(_sizeSlider.value) + (step * direction)));
+
+  _sizeSlider.value = next.toFixed(decimals);
+  _state.brushSize = parseInt(_sizeSlider.value, 10);
+  _updateSizeLabel();
+}
+
+function _handleBrushSizeHotkeys(event) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+  const target = event.target;
+  const tag = target?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+    return;
+  }
+
+  if (event.key === '[' || event.key === '{') {
+    event.preventDefault();
+    _adjustBrushSize(-1);
+    return;
+  }
+
+  if (event.key === ']' || event.key === '}') {
+    event.preventDefault();
+    _adjustBrushSize(1);
+  }
 }
 
 function _updateSizeLabel() {
