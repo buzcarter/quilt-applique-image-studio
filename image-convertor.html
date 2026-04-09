@@ -109,7 +109,20 @@
             </div>
             <div class="canvas-wrapper" data-panel="simplified" data-order="1">
                 <h3>Simplified</h3>
-                <canvas id="patternCanvas"></canvas>
+                <div class="paint-tools" id="paintTools">
+                    <button type="button" class="paint-tool-btn is-active" id="paintModeBtn">Paint</button>
+                    <button type="button" class="paint-tool-btn" id="eraseModeBtn">Erase</button>
+                    <label class="paint-brush-control" for="brushSize">
+                        <span>Brush</span>
+                        <input type="range" id="brushSize" min="4" max="60" value="18" step="1">
+                        <span class="paint-brush-value" id="brushSizeValue">18 px</span>
+                    </label>
+                    <button type="button" class="paint-tool-btn paint-tool-btn--ghost" id="clearOverlayBtn">Clear</button>
+                </div>
+                <div class="canvas-stack simplified-stack" id="simplifiedCanvasStack">
+                    <canvas id="patternCanvas"></canvas>
+                    <canvas id="paintOverlayCanvas"></canvas>
+                </div>
             </div>
             <div class="canvas-wrapper" data-panel="pattern" data-order="2">
                 <h3>Pattern</h3>

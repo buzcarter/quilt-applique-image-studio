@@ -323,6 +323,95 @@ input[type="range"]::-moz-range-thumb {
   margin-bottom: 6px;
 }
 
+.paint-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.paint-tool-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 999px;
+  min-height: 30px;
+  flex: 0 0 auto;
+}
+
+.paint-tool-btn.is-active {
+  background: #1f5d4d;
+}
+
+.paint-tool-btn--ghost {
+  background: #78847f;
+}
+
+.paint-tool-btn--ghost:hover {
+  background: #626d69;
+}
+
+.paint-brush-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d9e2dd;
+  border-radius: 999px;
+  background: #f5f8f7;
+  color: #2c5f4f;
+}
+
+.paint-brush-control span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.paint-brush-control input[type="range"] {
+  width: 92px;
+}
+
+.paint-brush-value {
+  min-width: 34px;
+  text-align: right;
+}
+
+.canvas-stack {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.canvas-stack canvas {
+  margin: 0;
+}
+
+#paintOverlayCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-color: transparent;
+  background: transparent;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.panel-sidebar .paint-tools {
+  display: none;
+}
+
+.panel-sidebar #paintOverlayCanvas {
+  pointer-events: none;
+}
+
+.panel-hero .simplified-stack {
+  max-width: 100%;
+}
+
 canvas {
   max-width: 100%;
   border: 1px solid #ddd;
@@ -556,6 +645,20 @@ button:disabled {
   .canvas-container {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
+  }
+
+  .paint-tools {
+    justify-content: flex-start;
+  }
+
+  .paint-brush-control {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 10px;
+  }
+
+  .paint-brush-control input[type="range"] {
+    flex: 1;
   }
 
   .panel-sidebar {

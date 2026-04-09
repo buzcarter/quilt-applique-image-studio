@@ -63,6 +63,7 @@ const controls = document.getElementById('controls');
 const canvasContainer = document.getElementById('canvasContainer');
 const originalCanvas = document.getElementById('originalCanvas');
 const patternCanvas = document.getElementById('patternCanvas');
+const paintOverlayCanvas = document.getElementById('paintOverlayCanvas');
 const paletteSection = document.getElementById('palette');
 const downloadBtn = document.getElementById('downloadBtn');
 const actionButtons = document.getElementById('actionButtons');
@@ -78,6 +79,18 @@ const curveComplexityValue = document.getElementById('curveComplexityValue');
 const smoothness = document.getElementById('smoothness');
 const smoothnessValue = document.getElementById('smoothnessValue');
 const fabricStatus = document.getElementById('fabricStatus');
+const paintModeBtn = document.getElementById('paintModeBtn');
+const eraseModeBtn = document.getElementById('eraseModeBtn');
+const clearOverlayBtn = document.getElementById('clearOverlayBtn');
+const brushSize = document.getElementById('brushSize');
+const brushSizeValue = document.getElementById('brushSizeValue');
+
+const paintState = {
+  mode: 'paint',
+  brushSize: 18,
+  isDrawing: false,
+  lastPoint: null,
+};
 
 // --- Init ---
 async function init() {
@@ -91,6 +104,7 @@ async function init() {
 
   setupUpload();
   setupControls();
+  setupPaintTools();
   setupCropPresets();
   setupButtons();
   setupPanelLayout();
@@ -206,6 +220,7 @@ function showCropStep() {
   });
 
   if (cropTool) cropTool.destroy();
+  clearPaintOverlay();
   cropTool = new CropTool(cropCanvas, originalImage, (crop) => {
     currentCrop = crop;
   });
@@ -324,6 +339,142 @@ function updateQuiltDimensions() {
   const aspectRatio = currentCrop.h / currentCrop.w;
   const heightInches = Math.round(widthInches * aspectRatio);
   quiltDimensions.textContent = `Pattern will be ${widthInches}" × ${heightInches}"`;
+}
+
+function setupPaintTools() {
+  updateBrushSizeLabel();
+  setPaintMode('paint');
+
+  paintModeBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setPaintMode('paint');
+  });
+
+  eraseModeBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setPaintMode('erase');
+  });
+
+  clearOverlayBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    clearPaintOverlay();
+  });
+
+  brushSize.addEventListener('input', (event) => {
+    event.stopPropagation();
+    paintState.brushSize = parseInt(brushSize.value, 10);
+    updateBrushSizeLabel();
+  });
+
+  for (const element of [paintModeBtn, eraseModeBtn, clearOverlayBtn, brushSize]) {
+    element.addEventListener('pointerdown', (event) => event.stopPropagation());
+    element.addEventListener('click', (event) => event.stopPropagation());
+  }
+
+  paintOverlayCanvas.addEventListener('pointerdown', beginOverlayStroke);
+  paintOverlayCanvas.addEventListener('pointermove', continueOverlayStroke);
+  paintOverlayCanvas.addEventListener('pointerup', endOverlayStroke);
+  paintOverlayCanvas.addEventListener('pointercancel', endOverlayStroke);
+}
+
+function setPaintMode(mode) {
+  paintState.mode = mode === 'erase' ? 'erase' : 'paint';
+  paintModeBtn.classList.toggle('is-active', paintState.mode === 'paint');
+  eraseModeBtn.classList.toggle('is-active', paintState.mode === 'erase');
+}
+
+function updateBrushSizeLabel() {
+  brushSizeValue.textContent = `${brushSize.value} px`;
+}
+
+function clearPaintOverlay() {
+  const ctx = paintOverlayCanvas.getContext('2d');
+  ctx.clearRect(0, 0, paintOverlayCanvas.width, paintOverlayCanvas.height);
+}
+
+function syncPaintOverlayCanvas(width, height) {
+  if (paintOverlayCanvas.width === width && paintOverlayCanvas.height === height) {
+    return;
+  }
+
+  const snapshot = document.createElement('canvas');
+  snapshot.width = paintOverlayCanvas.width;
+  snapshot.height = paintOverlayCanvas.height;
+  if (snapshot.width > 0 && snapshot.height > 0) {
+    snapshot.getContext('2d').drawImage(paintOverlayCanvas, 0, 0);
+  }
+
+  paintOverlayCanvas.width = width;
+  paintOverlayCanvas.height = height;
+
+  if (snapshot.width > 0 && snapshot.height > 0) {
+    paintOverlayCanvas.getContext('2d').drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, width, height);
+  }
+}
+
+function getOverlayPoint(event) {
+  const rect = paintOverlayCanvas.getBoundingClientRect();
+  const scaleX = paintOverlayCanvas.width / rect.width;
+  const scaleY = paintOverlayCanvas.height / rect.height;
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+  };
+}
+
+function drawOverlaySegment(fromPoint, toPoint) {
+  const ctx = paintOverlayCanvas.getContext('2d');
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = paintState.brushSize;
+
+  if (paintState.mode === 'erase') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(44, 95, 79, 0.42)';
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(fromPoint.x, fromPoint.y);
+  ctx.lineTo(toPoint.x, toPoint.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function beginOverlayStroke(event) {
+  if (event.button !== 0 && event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  paintState.isDrawing = true;
+  paintState.lastPoint = getOverlayPoint(event);
+  paintOverlayCanvas.setPointerCapture(event.pointerId);
+  drawOverlaySegment(paintState.lastPoint, paintState.lastPoint);
+}
+
+function continueOverlayStroke(event) {
+  if (!paintState.isDrawing) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const nextPoint = getOverlayPoint(event);
+  drawOverlaySegment(paintState.lastPoint, nextPoint);
+  paintState.lastPoint = nextPoint;
+}
+
+function endOverlayStroke(event) {
+  if (!paintState.isDrawing) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  paintState.isDrawing = false;
+  paintState.lastPoint = null;
+  if (paintOverlayCanvas.hasPointerCapture(event.pointerId)) {
+    paintOverlayCanvas.releasePointerCapture(event.pointerId);
+  }
 }
 
 // --- Processing Pipeline ---
@@ -539,6 +690,7 @@ function renderPatternPreview(activeColorIndex) {
   const { processedCanvas, processingW, processingH, displayW, displayH } = currentPatternRender;
   patternCanvas.width = displayW;
   patternCanvas.height = displayH;
+  syncPaintOverlayCanvas(displayW, displayH);
 
   const patternCtx = patternCanvas.getContext('2d');
   patternCtx.clearRect(0, 0, displayW, displayH);
