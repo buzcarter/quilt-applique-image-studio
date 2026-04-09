@@ -20,7 +20,7 @@ import { generatePatternSVG } from './svg-tracer.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
 import { initUpload } from './upload.js';
-import { initControlsPanel, getControlValues, restoreControlValues, setQuiltDimensionsText } from './controls-panel.js';
+import { initControlsPanel, getControlValues, restoreControlValues, resetControlValues, setQuiltDimensionsText } from './controls-panel.js';
 import {
   initPaintTool,
   clearPaintOverlay,
@@ -47,6 +47,8 @@ let pendingPaintOverlayDataUrl = null;
 
 // DOM refs used by the orchestration layer only
 const uploadArea      = document.getElementById('uploadArea');
+const cancelUploadRow = document.getElementById('cancelUploadRow');
+const newProjectArea  = document.getElementById('newProjectArea');
 const cropSection     = document.getElementById('cropSection');
 const cropCanvas      = document.getElementById('cropCanvas');
 const controls        = document.getElementById('controls');
@@ -70,8 +72,15 @@ async function init() {
   }
 
   initUpload((img, dataUrl) => {
+    const isNewProject = !!originalImage;
     originalImage = img;
     originalDataUrl = dataUrl;
+    if (isNewProject) {
+      resetControlValues();
+      clearPaintOverlay();
+      currentSimplifiedResult = null;
+      currentPatternRender = null;
+    }
     showCropStep();
   });
 
@@ -137,6 +146,8 @@ function persistSession() {
 // --- Flow ---
 function showCropStep() {
   uploadArea.classList.add('hidden');
+  cancelUploadRow.classList.add('hidden');
+  newProjectArea.classList.add('hidden');
   cropSection.classList.remove('hidden');
   controls.classList.add('hidden');
   canvasContainer.classList.add('hidden');
@@ -163,6 +174,7 @@ function applyCrop() {
   actionButtons.classList.remove('hidden');
   recropBtn.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
+  newProjectArea.classList.remove('hidden');
   _updateQuiltDimensions();
   persistSession();
   processQuantization();
@@ -404,6 +416,18 @@ function _setupButtons() {
   document.getElementById('resetCropBtn').addEventListener('click', () => cropTool?.resetCrop());
   document.getElementById('applyCropBtn').addEventListener('click', applyCrop);
   recropBtn.addEventListener('click', () => showCropStep());
+
+  document.getElementById('newProjectBtn').addEventListener('click', () => {
+    newProjectArea.classList.add('hidden');
+    cancelUploadRow.classList.remove('hidden');
+    uploadArea.classList.remove('hidden');
+  });
+
+  document.getElementById('cancelUploadBtn').addEventListener('click', () => {
+    uploadArea.classList.add('hidden');
+    cancelUploadRow.classList.add('hidden');
+    newProjectArea.classList.remove('hidden');
+  });
   downloadBtn.addEventListener('click', () => {
     const { quiltWidth } = getControlValues();
     const quiltHeightInches = currentCrop

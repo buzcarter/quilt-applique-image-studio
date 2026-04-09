@@ -657,6 +657,14 @@ button:disabled {
   display: none;
 }
 
+.new-project-area {
+  margin-top: 15px;
+}
+
+.new-project-area button {
+  width: 100%;
+}
+
 /* SVG pattern panel */
 #svgContainer {
   max-width: 100%;
