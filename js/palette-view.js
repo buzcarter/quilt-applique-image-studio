@@ -50,18 +50,19 @@ export function renderPalette(palette, totalPieces, { onHighlight, onUnhighlight
             : `${color.percentage}% · ${_formatPieces(color.pieceCount)}`,
         });
 
+    const swatchButton = swatch.querySelector('.color-chip-button');
+
     if (!color.isBackground) {
       swatch.addEventListener('mouseenter', () => onHighlight(color.colorIndex));
       swatch.addEventListener('mouseleave', () => onUnhighlight());
-      swatch.addEventListener('focus',      () => onHighlight(color.colorIndex));
-      swatch.addEventListener('blur',       () => onUnhighlight());
+      if (swatchButton) {
+        swatchButton.addEventListener('focus', () => onHighlight(color.colorIndex));
+        swatchButton.addEventListener('blur', () => onUnhighlight());
+      }
     }
 
-    const changeBtn = swatch.querySelector('[data-action="change-fabric"]');
-    if (changeBtn && typeof onChangeFabric === 'function') {
-      changeBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+    if (swatchButton && color.fabric && typeof onChangeFabric === 'function') {
+      swatchButton.addEventListener('click', () => {
         onChangeFabric(color.colorIndex);
       });
     }

@@ -1,0 +1,70 @@
+/* Crop Section */
+.crop-section {
+  margin: 20px 0;
+}
+
+.crop-section h3 {
+  color: #2c5f4f;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.crop-hint {
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.crop-canvas-wrapper {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.crop-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.crop-presets label {
+  display: inline;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 0;
+}
+
+.crop-preset-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: #eee;
+  color: #555;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: auto;
+}
+
+.crop-preset-btn:hover {
+  background: #ddd;
+}
+
+.crop-preset-btn.active {
+  background: #2c5f4f;
+  color: white;
+  border-color: #2c5f4f;
+}
+
+.crop-canvas-wrapper canvas {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  max-width: 100%;
+}
+
+.crop-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.crop-buttons button {
+  flex: 1;
+}

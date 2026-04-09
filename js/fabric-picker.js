@@ -120,7 +120,16 @@ function _renderOptions(fabrics) {
 
     const label = document.createElement('span');
     label.className = 'fabric-picker__label';
-    label.textContent = `${fabric.name} (${fabric.number})`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'fabric-picker__name';
+    nameSpan.textContent = fabric.name;
+
+    const skuSpan = document.createElement('span');
+    skuSpan.className = 'fabric-picker__sku';
+    skuSpan.textContent = fabric.number;
+
+    label.append(nameSpan, skuSpan);
 
     button.append(chip, label);
     refs.grid.appendChild(button);

@@ -1,0 +1,59 @@
+/* Buttons */
+button {
+  background: #2c5f4f;
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #234a3d;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #888;
+}
+
+.btn-secondary:hover {
+  background: #666;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.btn-row button {
+  flex: 1;
+}
+
+#newProjectBtn,
+#downloadBtn {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#newProjectBtn img,
+#downloadBtn img {
+  filter: brightness(0) invert(1);
+  display: block;
+  flex-shrink: 0;
+}
+
+.new-project-area button {
+  display: block;
+  width: 100%;
+}
