@@ -158,6 +158,43 @@
         </div>
     </div>
 
+    <template id="tpl-swatch-fabric">
+        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+            <div class="color-box" style="background-color: {{FABRIC_HEX}}"></div>
+            <div class="color-info">
+                <div class="fabric-name-row">
+                    <div class="fabric-name">{{FABRIC_NAME}}</div>
+                    {{BACKGROUND_BADGE}}
+                </div>
+                <div class="fabric-details">
+                    <span class="fabric-number">{{FABRIC_NUMBER}}</span>
+                    <span class="fabric-sep">·</span>
+                    <span class="color-percent">{{PERCENTAGE}}%</span>
+                    {{PIECE_DETAILS}}
+                </div>
+                <div class="fabric-match-bar">
+                    <span class="match-swatch" style="background-color: {{IMAGE_HEX}}" title="Image color {{IMAGE_HEX}}"></span>
+                    <span class="match-arrow">→</span>
+                    <span class="match-swatch" style="background-color: {{FABRIC_HEX}}" title="Kona {{FABRIC_NAME}} {{FABRIC_HEX}}"></span>
+                    <span class="match-delta" title="Color difference (lower = closer match)">Δ{{DELTA}}</span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-swatch-raw">
+        <div class="color-swatch{{BACKGROUND_CLASS}}" tabindex="0" data-color-index="{{COLOR_INDEX}}">
+            <div class="color-box" style="background-color: {{HEX}}"></div>
+            <div class="color-info">
+                <div class="fabric-name-row">
+                    <div class="color-hex">{{HEX}}</div>
+                    {{BACKGROUND_BADGE}}
+                </div>
+                <div class="color-percent">{{PERCENTAGE_PIECES}}</div>
+            </div>
+        </div>
+    </template>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
     <script type="module" src="js/app.js"></script>

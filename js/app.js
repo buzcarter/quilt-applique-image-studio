@@ -1,5 +1,9 @@
 /**
- * Main application: orchestrates the quilting pipeline.
+ * Main application — orchestrates the quilting pipeline.
+ *
+ * This module scaffolds and wires together submodules. It owns app-level
+ * state and the two pipeline stages; all rendering and DOM mutation is
+ * delegated to the appropriate submodule.
  *
  * Processing pipeline (order of operations):
  * 1. CROP — user selects region of interest (original always retained for re-crop)
@@ -8,10 +12,6 @@
  * 4. REGION MERGING — absorb isolated regions below the minimum piece threshold
  * 5. FABRIC MATCHING — map quantized colors to nearest Kona Cotton Solid
  * 6. DISPLAY — show pattern preview + fabric shopping list
- *
- * Future steps (not yet implemented):
- * - EDGE SMOOTHING — contour simplification for organic shapes
- * - SVG OUTPUT — vector paths per fabric region (the real deliverable)
  */
 import { CropTool } from './crop-tool.js';
 import { quantizeColors, mergeSmallRegions } from './image-processing.js';
@@ -19,8 +19,13 @@ import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
 import { generatePatternSVG } from './svg-tracer.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
+import { initUpload } from './upload.js';
+import { initControlsPanel, getControlValues, restoreControlValues, setQuiltDimensionsText } from './controls-panel.js';
+import { initPaintTool, clearPaintOverlay, syncPaintOverlayCanvas, refreshPaintColorOptions, getMergedAssignments } from './paint-tool.js';
+import { renderPalette } from './palette-view.js';
+import { initPanelLayout } from './panel-layout.js';
 
-// State
+// --- App state ---
 let originalImage = null;
 let originalDataUrl = null;
 let cropTool = null;
@@ -30,73 +35,20 @@ let currentTotalPieces = 0;
 let currentPatternRender = null;
 let currentPatternSvgMarkup = '';
 let currentSimplifiedResult = null; // cached quantization; only cleared by crop/size/color changes
-let paintPaletteOptions = [];
 
-function chooseBackgroundColorIndex(palette) {
-  if (!palette || palette.length === 0) return null;
-
-  const sorted = [...palette].sort((a, b) => {
-    const aPixels = Number(a.pixelCount || 0);
-    const bPixels = Number(b.pixelCount || 0);
-    if (bPixels !== aPixels) return bPixels - aPixels;
-
-    const aPercent = Number(a.percentage || 0);
-    const bPercent = Number(b.percentage || 0);
-    if (bPercent !== aPercent) return bPercent - aPercent;
-
-    const aLabel = String(a.fabric?.name || a.hex || '').toLowerCase();
-    const bLabel = String(b.fabric?.name || b.hex || '').toLowerCase();
-    return aLabel.localeCompare(bLabel);
-  });
-
-  return sorted[0]?.colorIndex ?? null;
-}
-
-// DOM refs
-const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('fileInput');
-const cropSection = document.getElementById('cropSection');
-const cropCanvas = document.getElementById('cropCanvas');
-const resetCropBtn = document.getElementById('resetCropBtn');
-const applyCropBtn = document.getElementById('applyCropBtn');
-const recropBtn = document.getElementById('recropBtn');
-const controls = document.getElementById('controls');
+// DOM refs used by the orchestration layer only
+const uploadArea      = document.getElementById('uploadArea');
+const cropSection     = document.getElementById('cropSection');
+const cropCanvas      = document.getElementById('cropCanvas');
+const controls        = document.getElementById('controls');
 const canvasContainer = document.getElementById('canvasContainer');
-const originalCanvas = document.getElementById('originalCanvas');
-const patternCanvas = document.getElementById('patternCanvas');
-const paintOverlayCanvas = document.getElementById('paintOverlayCanvas');
-const brushCursorEl = document.getElementById('brushCursor');
-const paletteSection = document.getElementById('palette');
-const downloadBtn = document.getElementById('downloadBtn');
-const actionButtons = document.getElementById('actionButtons');
-const colorSlider = document.getElementById('colorSlider');
-const colorValue = document.getElementById('colorValue');
-const quiltWidth = document.getElementById('quiltWidth');
-const quiltWidthValue = document.getElementById('quiltWidthValue');
-const quiltDimensions = document.getElementById('quiltDimensions');
-const minPieceSize = document.getElementById('minPieceSize');
-const minPieceSizeValue = document.getElementById('minPieceSizeValue');
-const curveComplexity = document.getElementById('curveComplexity');
-const curveComplexityValue = document.getElementById('curveComplexityValue');
-const smoothness = document.getElementById('smoothness');
-const smoothnessValue = document.getElementById('smoothnessValue');
-const fabricStatus = document.getElementById('fabricStatus');
-const paintModeBtn = document.getElementById('paintModeBtn');
-const eraseModeBtn = document.getElementById('eraseModeBtn');
-const clearOverlayBtn = document.getElementById('clearOverlayBtn');
-const brushSize = document.getElementById('brushSize');
-const brushSizeValue = document.getElementById('brushSizeValue');
-const paintColorSelect = document.getElementById('paintColorSelect');
-const paintColorChip = document.getElementById('paintColorChip');
-
-const paintState = {
-  mode: 'paint',
-  brushSize: 18,
-  colorHex: '#2c5f4f',
-  colorIndex: null,
-  isDrawing: false,
-  lastPoint: null,
-};
+const originalCanvas  = document.getElementById('originalCanvas');
+const patternCanvas   = document.getElementById('patternCanvas');
+const paletteSection  = document.getElementById('palette');
+const actionButtons   = document.getElementById('actionButtons');
+const recropBtn       = document.getElementById('recropBtn');
+const downloadBtn     = document.getElementById('downloadBtn');
+const fabricStatus    = document.getElementById('fabricStatus');
 
 // --- Init ---
 async function init() {
@@ -108,12 +60,26 @@ async function init() {
     console.error('Failed to load fabric library:', err);
   }
 
-  setupUpload();
-  setupControls();
-  setupPaintTools();
-  setupCropPresets();
-  setupButtons();
-  setupPanelLayout();
+  initUpload((img, dataUrl) => {
+    originalImage = img;
+    originalDataUrl = dataUrl;
+    showCropStep();
+  });
+
+  initControlsPanel({
+    onQuantize:   () => { if (originalImage && currentCrop) { _updateQuiltDimensions(); processQuantization(); persistSession(); } },
+    onPattern:    () => { if (currentSimplifiedResult) { processPattern(); persistSession(); } },
+    onWidthChange: () => _updateQuiltDimensions(),
+  });
+
+  initPaintTool({
+    onStrokeEnd: () => { if (currentSimplifiedResult) processPattern(); },
+    onClear:     () => { if (currentSimplifiedResult) processPattern(); },
+  });
+
+  _setupCropPresets();
+  _setupButtons();
+  initPanelLayout(canvasContainer);
   restoreSession();
 }
 
@@ -126,28 +92,7 @@ function restoreSession() {
   img.onload = () => {
     originalImage = img;
     originalDataUrl = session.imageDataUrl;
-
-    if (session.numColors) {
-      colorSlider.value = session.numColors;
-      colorValue.textContent = session.numColors;
-    }
-    if (session.quiltWidth) {
-      quiltWidth.value = session.quiltWidth;
-      quiltWidthValue.textContent = session.quiltWidth + '"';
-    }
-    if (session.minPieceSize) {
-      minPieceSize.value = session.minPieceSize;
-      minPieceSizeValue.textContent = session.minPieceSize + '"';
-    }
-    if (session.curveComplexity !== undefined) {
-      curveComplexity.value = session.curveComplexity;
-      curveComplexityValue.textContent = session.curveComplexity + '%';
-    }
-    if (session.smoothness !== undefined) {
-      smoothness.value = session.smoothness;
-      smoothnessValue.textContent = session.smoothness + '%';
-    }
-
+    restoreControlValues(session);
     if (session.crop) {
       currentCrop = session.crop;
       applyCrop();
@@ -160,58 +105,19 @@ function restoreSession() {
 
 function persistSession() {
   if (!originalDataUrl) return;
+  const { numColors, quiltWidth, minPieceSize, curveComplexity, smoothness } = getControlValues();
   saveSession({
     imageDataUrl: originalDataUrl,
     crop: currentCrop,
-    numColors: parseInt(colorSlider.value),
-    quiltWidth: parseInt(quiltWidth.value),
-    minPieceSize: parseFloat(minPieceSize.value),
-    curveComplexity: parseInt(curveComplexity.value),
-    smoothness: parseInt(smoothness.value),
+    numColors,
+    quiltWidth,
+    minPieceSize,
+    curveComplexity,
+    smoothness,
   });
 }
 
-// --- Upload ---
-function setupUpload() {
-  uploadArea.addEventListener('click', () => fileInput.click());
-
-  uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('dragging');
-  });
-
-  uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('dragging');
-  });
-
-  uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('dragging');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) loadImage(file);
-  });
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) loadImage(file);
-  });
-}
-
-function loadImage(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const img = new Image();
-    img.onload = () => {
-      originalImage = img;
-      originalDataUrl = e.target.result;
-      showCropStep();
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-// --- Crop Step ---
+// --- Flow ---
 function showCropStep() {
   uploadArea.classList.add('hidden');
   cropSection.classList.remove('hidden');
@@ -220,7 +126,6 @@ function showCropStep() {
   paletteSection.classList.add('hidden');
   actionButtons.classList.add('hidden');
 
-  // Reset preset buttons to "Free"
   document.querySelectorAll('.crop-preset-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.ratio === 'free');
   });
@@ -241,18 +146,16 @@ function applyCrop() {
   actionButtons.classList.remove('hidden');
   recropBtn.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
-  updateQuiltDimensions();
+  _updateQuiltDimensions();
   persistSession();
   processQuantization();
 }
 
-// --- Crop Presets ---
-function setupCropPresets() {
+function _setupCropPresets() {
   document.querySelectorAll('.crop-preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.crop-preset-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-
       const ratio = btn.dataset.ratio;
       if (cropTool) {
         cropTool.setAspectRatio(ratio === 'free' ? null : 1);
@@ -261,432 +164,63 @@ function setupCropPresets() {
   });
 }
 
-// --- Controls ---
-function setupControls() {
-  // Slow sliders: re-run full quantization pipeline (k-means + merge + SVG)
-  let quantizeTimer = null;
-  const debounceQuantize = () => {
-    clearTimeout(quantizeTimer);
-    quantizeTimer = setTimeout(() => {
-      if (originalImage && currentCrop) {
-        processQuantization();
-        persistSession();
-      }
-    }, 150);
-  };
+// --- Helpers ---
 
-  // Fast sliders: only regenerate SVG from cached assignments — deterministic
-  let patternTimer = null;
-  const debouncePattern = () => {
-    clearTimeout(patternTimer);
-    patternTimer = setTimeout(() => {
-      if (currentSimplifiedResult) {
-        processPattern();
-        persistSession();
-      }
-    }, 80);
-  };
-
-  const nudgeSlider = (slider, direction) => {
-    const min = parseFloat(slider.min);
-    const max = parseFloat(slider.max);
-    const step = parseFloat(slider.step || '1');
-    const currentValue = parseFloat(slider.value);
-    const decimalPlaces = (slider.step.split('.')[1] || '').length;
-    const nextValue = Math.min(max, Math.max(min, currentValue + (step * direction)));
-
-    slider.value = nextValue.toFixed(decimalPlaces);
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  };
-
-  document.querySelectorAll('.slider-step-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      const sliderId = button.dataset.target;
-      const direction = parseInt(button.dataset.direction, 10);
-      const slider = document.getElementById(sliderId);
-      if (!slider || Number.isNaN(direction)) return;
-      nudgeSlider(slider, direction);
-    });
-  });
-
-  // These sliders change pixel data → must re-quantize
-  quiltWidth.addEventListener('input', () => {
-    quiltWidthValue.textContent = quiltWidth.value + '"';
-    updateQuiltDimensions();
-    debounceQuantize();
-  });
-
-  colorSlider.addEventListener('input', () => {
-    colorValue.textContent = colorSlider.value;
-    debounceQuantize();
-  });
-
-  minPieceSize.addEventListener('input', () => {
-    minPieceSizeValue.textContent = minPieceSize.value + '"';
-    debounceQuantize();
-  });
-
-  // These sliders only change SVG generation → reuse cached assignments
-  curveComplexity.addEventListener('input', () => {
-    curveComplexityValue.textContent = curveComplexity.value + '%';
-    debouncePattern();
-  });
-
-  smoothness.addEventListener('input', () => {
-    smoothnessValue.textContent = smoothness.value + '%';
-    debouncePattern();
-  });
-}
-
-/** Show computed quilt height based on crop ratio and chosen width */
-function updateQuiltDimensions() {
+function _updateQuiltDimensions() {
   if (!currentCrop) return;
-  const widthInches = parseInt(quiltWidth.value);
-  const aspectRatio = currentCrop.h / currentCrop.w;
-  const heightInches = Math.round(widthInches * aspectRatio);
-  quiltDimensions.textContent = `Pattern will be ${widthInches}" × ${heightInches}"`;
+  const { quiltWidth } = getControlValues();
+  const h = Math.round(quiltWidth * (currentCrop.h / currentCrop.w));
+  setQuiltDimensionsText(`Pattern will be ${quiltWidth}" × ${h}"`);
 }
 
-function setupPaintTools() {
-  updateBrushSizeLabel();
-  setPaintMode('paint');
-  refreshPaintColorOptions([]);
-
-  paintModeBtn.addEventListener('change', (event) => {
-    event.stopPropagation();
-    if (paintModeBtn.checked) setPaintMode('paint');
-  });
-
-  eraseModeBtn.addEventListener('change', (event) => {
-    event.stopPropagation();
-    if (eraseModeBtn.checked) setPaintMode('erase');
-  });
-
-  clearOverlayBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    clearPaintOverlay(true);
-  });
-
-  brushSize.addEventListener('input', (event) => {
-    event.stopPropagation();
-    paintState.brushSize = parseInt(brushSize.value, 10);
-    updateBrushSizeLabel();
-  });
-
-  paintColorSelect.addEventListener('change', (event) => {
-    event.stopPropagation();
-    applySelectedPaintColor();
-  });
-
-  for (const element of [paintModeBtn, eraseModeBtn, clearOverlayBtn, brushSize, paintColorSelect]) {
-    element.addEventListener('pointerdown', (event) => event.stopPropagation());
-    element.addEventListener('click', (event) => event.stopPropagation());
-  }
-
-  paintOverlayCanvas.addEventListener('pointerdown', beginOverlayStroke);
-  paintOverlayCanvas.addEventListener('pointermove', continueOverlayStroke);
-  paintOverlayCanvas.addEventListener('pointermove', moveBrushCursor);
-  paintOverlayCanvas.addEventListener('pointerenter', () => { brushCursorEl.hidden = false; });
-  paintOverlayCanvas.addEventListener('pointerleave', () => { brushCursorEl.hidden = true; });
-  paintOverlayCanvas.addEventListener('pointerup', endOverlayStroke);
-  paintOverlayCanvas.addEventListener('pointercancel', endOverlayStroke);
+function _chooseBackgroundColorIndex(palette) {
+  if (!palette || palette.length === 0) return null;
+  return [...palette].sort((a, b) => {
+    if (b.pixelCount !== a.pixelCount) return b.pixelCount - a.pixelCount;
+    if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+    const aLabel = String(a.fabric?.name || a.hex || '').toLowerCase();
+    const bLabel = String(b.fabric?.name || b.hex || '').toLowerCase();
+    return aLabel.localeCompare(bLabel);
+  })[0]?.colorIndex ?? null;
 }
 
-function moveBrushCursor(event) {
-  const rect = paintOverlayCanvas.getBoundingClientRect();
-  const cssRadius = (paintState.brushSize / 2) * (rect.width / paintOverlayCanvas.width);
-  const cssX = event.clientX - rect.left;
-  const cssY = event.clientY - rect.top;
-  brushCursorEl.style.width = `${cssRadius * 2}px`;
-  brushCursorEl.style.height = `${cssRadius * 2}px`;
-  brushCursorEl.style.left = `${cssX - cssRadius}px`;
-  brushCursorEl.style.top = `${cssY - cssRadius}px`;
+function _buildPaletteFromAssignments(assignments, palette, matchedPalette) {
+  const total = assignments.length;
+  const counts = new Map(palette.map((e) => [e.colorIndex, 0]));
+  for (const ci of assignments) counts.set(ci, (counts.get(ci) || 0) + 1);
+  const update = (list) =>
+    list
+      .map((e) => {
+        const pixelCount = counts.get(e.colorIndex) || 0;
+        return { ...e, pixelCount, percentage: ((pixelCount / total) * 100).toFixed(1) };
+      })
+      .sort((a, b) => b.pixelCount - a.pixelCount);
+  return { updatedPalette: update(palette), updatedMatchedPalette: update(matchedPalette) };
 }
 
-function setPaintMode(mode) {
-  paintState.mode = mode === 'erase' ? 'erase' : 'paint';
-  paintModeBtn.checked = paintState.mode === 'paint';
-  eraseModeBtn.checked = paintState.mode === 'erase';
-}
-
-function updateBrushSizeLabel() {
-  brushSizeValue.textContent = `${brushSize.value} px`;
-}
-
-function updatePaintColorChip() {
-  paintColorChip.style.backgroundColor = paintState.colorHex;
-}
-
-function refreshPaintColorOptions(palette) {
-  const previousValue = paintColorSelect.value;
-  paintColorSelect.innerHTML = '';
-
-  paintPaletteOptions = (palette && palette.length > 0)
-    ? palette.map((entry) => ({
-        colorIndex: entry.colorIndex,
-        overlayHex: entry.hex,
-        label: entry.fabric?.name || entry.hex,
-      }))
-    : [{ colorIndex: 0, overlayHex: '#2c5f4f', label: 'Default Green' }];
-
-  for (const entry of paintPaletteOptions) {
-    const option = document.createElement('option');
-    option.value = String(entry.colorIndex);
-    option.textContent = entry.label;
-    paintColorSelect.appendChild(option);
-  }
-
-  const hasPrevious = paintPaletteOptions.some((entry) => String(entry.colorIndex) === previousValue);
-  paintColorSelect.value = hasPrevious ? previousValue : String(paintPaletteOptions[0].colorIndex);
-  applySelectedPaintColor();
-}
-
-function applySelectedPaintColor() {
-  const selected = paintPaletteOptions.find((entry) => String(entry.colorIndex) === paintColorSelect.value) || paintPaletteOptions[0];
-  paintState.colorIndex = selected.colorIndex;
-  paintState.colorHex = selected.overlayHex;
-  updatePaintColorChip();
-}
-
-function clearPaintOverlay(refreshPattern = false) {
-  const ctx = paintOverlayCanvas.getContext('2d');
-  ctx.clearRect(0, 0, paintOverlayCanvas.width, paintOverlayCanvas.height);
-
-  if (refreshPattern && currentSimplifiedResult) {
-    processPattern();
-  }
-}
-
-function syncPaintOverlayCanvas(width, height) {
-  if (paintOverlayCanvas.width === width && paintOverlayCanvas.height === height) {
-    return;
-  }
-
-  const snapshot = document.createElement('canvas');
-  snapshot.width = paintOverlayCanvas.width;
-  snapshot.height = paintOverlayCanvas.height;
-  if (snapshot.width > 0 && snapshot.height > 0) {
-    snapshot.getContext('2d').drawImage(paintOverlayCanvas, 0, 0);
-  }
-
-  paintOverlayCanvas.width = width;
-  paintOverlayCanvas.height = height;
-
-  if (snapshot.width > 0 && snapshot.height > 0) {
-    paintOverlayCanvas.getContext('2d').drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, width, height);
-  }
-}
-
-function getOverlayPoint(event) {
-  const rect = paintOverlayCanvas.getBoundingClientRect();
-  const scaleX = paintOverlayCanvas.width / rect.width;
-  const scaleY = paintOverlayCanvas.height / rect.height;
-  return {
-    x: (event.clientX - rect.left) * scaleX,
-    y: (event.clientY - rect.top) * scaleY,
-  };
-}
-
-function drawOverlaySegment(fromPoint, toPoint) {
-  const ctx = paintOverlayCanvas.getContext('2d');
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = paintState.brushSize;
-
-  if (paintState.mode === 'erase') {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-  } else {
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = paintState.colorHex;
-  }
-
-  ctx.beginPath();
-  ctx.moveTo(fromPoint.x, fromPoint.y);
-  ctx.lineTo(toPoint.x, toPoint.y);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function beginOverlayStroke(event) {
-  if (event.button !== 0 && event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
-  event.preventDefault();
-  event.stopPropagation();
-
-  paintState.isDrawing = true;
-  paintState.lastPoint = getOverlayPoint(event);
-  paintOverlayCanvas.setPointerCapture(event.pointerId);
-  drawOverlaySegment(paintState.lastPoint, paintState.lastPoint);
-}
-
-function continueOverlayStroke(event) {
-  if (!paintState.isDrawing) return;
-  event.preventDefault();
-  event.stopPropagation();
-
-  const nextPoint = getOverlayPoint(event);
-  drawOverlaySegment(paintState.lastPoint, nextPoint);
-  paintState.lastPoint = nextPoint;
-}
-
-function endOverlayStroke(event) {
-  if (!paintState.isDrawing) return;
-  event.preventDefault();
-  event.stopPropagation();
-
-  paintState.isDrawing = false;
-  paintState.lastPoint = null;
-  if (paintOverlayCanvas.hasPointerCapture(event.pointerId)) {
-    paintOverlayCanvas.releasePointerCapture(event.pointerId);
-  }
-
-  if (currentSimplifiedResult) {
-    processPattern();
-  }
-}
-
-function parseHexToRgb(hex) {
-  const normalized = String(hex || '').replace('#', '');
-  if (normalized.length !== 6) return [44, 95, 79];
-  return [
-    parseInt(normalized.slice(0, 2), 16),
-    parseInt(normalized.slice(2, 4), 16),
-    parseInt(normalized.slice(4, 6), 16),
-  ];
-}
-
-function getNearestPaintColorIndex(red, green, blue) {
-  let bestIndex = paintPaletteOptions[0]?.colorIndex ?? 0;
-  let bestDistance = Infinity;
-
-  for (const entry of paintPaletteOptions) {
-    const [targetRed, targetGreen, targetBlue] = parseHexToRgb(entry.overlayHex);
-    const distance = ((red - targetRed) ** 2) + ((green - targetGreen) ** 2) + ((blue - targetBlue) ** 2);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = entry.colorIndex;
-    }
-  }
-
-  return bestIndex;
-}
-
-function getMergedAssignments(baseAssignments, processingW, processingH) {
-  if (!paintOverlayCanvas.width || !paintOverlayCanvas.height) {
-    return { assignments: baseAssignments, hasPaint: false };
-  }
-
-  const mergedAssignments = new Uint16Array(baseAssignments);
-  const scaledOverlayCanvas = document.createElement('canvas');
-  scaledOverlayCanvas.width = processingW;
-  scaledOverlayCanvas.height = processingH;
-  const scaledOverlayCtx = scaledOverlayCanvas.getContext('2d');
-  scaledOverlayCtx.clearRect(0, 0, processingW, processingH);
-  scaledOverlayCtx.imageSmoothingEnabled = true;
-  scaledOverlayCtx.drawImage(
-    paintOverlayCanvas,
-    0,
-    0,
-    paintOverlayCanvas.width,
-    paintOverlayCanvas.height,
-    0,
-    0,
-    processingW,
-    processingH
-  );
-
-  const overlayPixels = scaledOverlayCtx.getImageData(0, 0, processingW, processingH).data;
-  let hasPaint = false;
-
-  for (let i = 0; i < mergedAssignments.length; i++) {
-    const offset = i * 4;
-    if (overlayPixels[offset + 3] < 12) continue;
-    hasPaint = true;
-    mergedAssignments[i] = getNearestPaintColorIndex(
-      overlayPixels[offset],
-      overlayPixels[offset + 1],
-      overlayPixels[offset + 2]
-    );
-  }
-
-  return {
-    assignments: hasPaint ? mergedAssignments : baseAssignments,
-    hasPaint,
-  };
-}
-
-function buildPaletteFromAssignments(assignments, palette, matchedPalette) {
-  const totalPixels = assignments.length;
-  const colorCounts = new Map();
-
-  for (const entry of palette) {
-    colorCounts.set(entry.colorIndex, 0);
-  }
-
-  for (let i = 0; i < assignments.length; i++) {
-    colorCounts.set(assignments[i], (colorCounts.get(assignments[i]) || 0) + 1);
-  }
-
-  const updatedPalette = palette
-    .map((entry) => {
-      const pixelCount = colorCounts.get(entry.colorIndex) || 0;
-      return {
-        ...entry,
-        pixelCount,
-        percentage: ((pixelCount / totalPixels) * 100).toFixed(1),
-      };
-    })
-    .sort((a, b) => b.pixelCount - a.pixelCount);
-
-  const updatedMatchedPalette = matchedPalette
-    .map((entry) => {
-      const pixelCount = colorCounts.get(entry.colorIndex) || 0;
-      return {
-        ...entry,
-        pixelCount,
-        percentage: ((pixelCount / totalPixels) * 100).toFixed(1),
-      };
-    })
-    .sort((a, b) => b.pixelCount - a.pixelCount);
-
-  return { updatedPalette, updatedMatchedPalette };
-}
-
-// --- Processing Pipeline ---
+// --- Pipeline ---
 
 /**
  * Stage 1 — runs k-means quantization and region merging.
  * Triggered by: quiltWidth, colorSlider, minPieceSize, or a new crop.
- * Updates the Simplified canvas and caches result in currentSimplifiedResult.
- * Always calls processPattern() afterwards.
  */
 function processQuantization() {
   if (!originalImage || !currentCrop) return;
 
-  const numColors = parseInt(colorSlider.value);
-  const widthInches = parseInt(quiltWidth.value);
-  const pieceSize = parseFloat(minPieceSize.value);
+  const { numColors, quiltWidth, minPieceSize } = getControlValues();
 
-  // Step 1: Extract cropped region
   const srcCanvas = document.createElement('canvas');
   srcCanvas.width = currentCrop.w;
   srcCanvas.height = currentCrop.h;
-  const srcCtx = srcCanvas.getContext('2d');
-  srcCtx.drawImage(
-    originalImage,
-    currentCrop.x, currentCrop.y, currentCrop.w, currentCrop.h,
-    0, 0, currentCrop.w, currentCrop.h
-  );
+  srcCanvas.getContext('2d').drawImage(
+    originalImage, currentCrop.x, currentCrop.y, currentCrop.w, currentCrop.h,
+    0, 0, currentCrop.w, currentCrop.h);
 
-  // Step 2: Choose a processing resolution that preserves contours.
-  const processingW = Math.min(currentCrop.w, Math.max(320, Math.min(1200, Math.round(widthInches * 24))));
+  const processingW = Math.min(currentCrop.w, Math.max(320, Math.min(1200, Math.round(quiltWidth * 24))));
   const aspectRatio = currentCrop.h / currentCrop.w;
   const processingH = Math.max(4, Math.round(processingW * aspectRatio));
 
-  // Step 3: Display original (cropped) at screen resolution
-  const maxDisplayWidth = 400;
-  const displayScale = Math.min(maxDisplayWidth / currentCrop.w, 1);
+  const displayScale = Math.min(400 / currentCrop.w, 1);
   const displayW = Math.floor(currentCrop.w * displayScale);
   const displayH = Math.floor(currentCrop.h * displayScale);
 
@@ -694,7 +228,6 @@ function processQuantization() {
   originalCanvas.height = displayH;
   originalCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, displayW, displayH);
 
-  // Step 4: Quantize at a higher resolution, then merge tiny isolated regions.
   const workCanvas = document.createElement('canvas');
   workCanvas.width = processingW;
   workCanvas.height = processingH;
@@ -704,40 +237,22 @@ function processQuantization() {
 
   const imageData = workCtx.getImageData(0, 0, processingW, processingH);
   const quantized = quantizeColors(imageData, numColors);
-  const pixelsPerInch = processingW / widthInches;
-  const minimumRegionPixels = Math.max(1, Math.round((pieceSize * pixelsPerInch) ** 2));
-  const simplified = mergeSmallRegions(quantized, minimumRegionPixels);
+  const pxPerInch = processingW / quiltWidth;
+  const minRegionPx = Math.max(1, Math.round((minPieceSize * pxPerInch) ** 2));
+  const simplified = mergeSmallRegions(quantized, minRegionPx);
 
-  // Step 5: Render pattern preview with smoothed scaling for organic boundaries.
   const processedCanvas = document.createElement('canvas');
   processedCanvas.width = processingW;
   processedCanvas.height = processingH;
   processedCanvas.getContext('2d').putImageData(simplified.imageData, 0, 0);
 
-  currentPatternRender = {
-    processedCanvas,
-    assignments: simplified.assignments,
-    processingW,
-    processingH,
-    displayW,
-    displayH,
-    maskCache: new Map(),
-  };
+  currentPatternRender = { processedCanvas, assignments: simplified.assignments, processingW, processingH, displayW, displayH, maskCache: new Map() };
   renderPatternPreview(null);
 
-  // Resolve fabric names so background tie-break uses human-readable names
   const matchedPalette = matchPaletteToFabrics(simplified.palette);
-  const backgroundColorIndex = chooseBackgroundColorIndex(matchedPalette);
+  const backgroundColorIndex = _chooseBackgroundColorIndex(matchedPalette);
 
-  // Cache everything processPattern() needs
-  currentSimplifiedResult = {
-    assignments: simplified.assignments,
-    processingW,
-    processingH,
-    palette: simplified.palette,
-    matchedPalette,
-    backgroundColorIndex,
-  };
+  currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, palette: simplified.palette, matchedPalette, backgroundColorIndex };
 
   processPattern();
 }
@@ -745,40 +260,31 @@ function processQuantization() {
 /**
  * Stage 2 — generates the SVG Pattern from cached Simplified data.
  * Triggered by: curveComplexity, smoothness (or after processQuantization).
- * Pure and deterministic: same inputs always produce the same SVG.
- * Does NOT touch the Simplified canvas or re-run k-means.
  */
 function processPattern() {
   if (!currentSimplifiedResult) return;
 
   const { assignments, processingW, processingH, palette, matchedPalette } =
     currentSimplifiedResult;
+  const { curveComplexity, smoothness } = getControlValues();
 
   const mergedSource = getMergedAssignments(assignments, processingW, processingH);
-  const { updatedPalette, updatedMatchedPalette } = buildPaletteFromAssignments(
+  const { updatedPalette, updatedMatchedPalette } = _buildPaletteFromAssignments(
     mergedSource.assignments,
     palette,
     matchedPalette
   );
-  const backgroundColorIndex = chooseBackgroundColorIndex(updatedMatchedPalette);
+  const backgroundColorIndex = _chooseBackgroundColorIndex(updatedMatchedPalette);
 
-  const curveComplexityAmt = parseInt(curveComplexity.value, 10);
-  const smoothnessAmt = parseInt(smoothness.value, 10);
-
-  const svgContainer = document.getElementById('svgContainer');
   const svgResult = generatePatternSVG(
     mergedSource.assignments,
     processingW,
     processingH,
     updatedPalette,
-    {
-      backgroundColorIndex,
-      curveComplexity: curveComplexityAmt,
-      smoothness: smoothnessAmt,
-    }
+    { backgroundColorIndex, curveComplexity, smoothness }
   );
   currentPatternSvgMarkup = svgResult.svg;
-  svgContainer.innerHTML = svgResult.svg;
+  document.getElementById('svgContainer').innerHTML = svgResult.svg;
 
   currentPalette = updatedMatchedPalette.map((entry) => ({
     ...entry,
@@ -786,88 +292,15 @@ function processPattern() {
     isBackground: entry.colorIndex === backgroundColorIndex,
   }));
   currentTotalPieces = svgResult.totalPieces;
-  displayPalette(currentPalette, currentTotalPieces);
+
+  renderPalette(currentPalette, currentTotalPieces, {
+    onHighlight:   (ci) => { renderPatternPreview(ci); _highlightSVGColor(ci); },
+    onUnhighlight: ()   => { renderPatternPreview(null); _highlightSVGColor(null); },
+  });
+  refreshPaintColorOptions(currentSimplifiedResult.matchedPalette || currentPalette);
 }
 
-function displayPalette(palette, totalPieces) {
-  document.getElementById('paletteCount').textContent = palette.length;
-  document.getElementById('pieceCount').textContent = totalPieces;
-  document.getElementById('patternPanelFabricCount').textContent = palette.length;
-  document.getElementById('patternPanelPieceCount').textContent = totalPieces;
-  refreshPaintColorOptions(currentSimplifiedResult?.matchedPalette || palette);
-  const container = document.getElementById('colorSwatches');
-  container.innerHTML = '';
-
-  for (const color of palette) {
-    const swatch = document.createElement('div');
-    swatch.className = 'color-swatch';
-    if (color.isBackground) {
-      swatch.classList.add('color-swatch--background');
-    }
-    swatch.tabIndex = 0;
-    swatch.dataset.colorIndex = String(color.colorIndex);
-
-    if (!color.isBackground) {
-      swatch.addEventListener('mouseenter', () => {
-        renderPatternPreview(color.colorIndex);
-        highlightSVGColor(color.colorIndex);
-      });
-      swatch.addEventListener('mouseleave', () => {
-        renderPatternPreview(null);
-        highlightSVGColor(null);
-      });
-      swatch.addEventListener('focus', () => {
-        renderPatternPreview(color.colorIndex);
-        highlightSVGColor(color.colorIndex);
-      });
-      swatch.addEventListener('blur', () => {
-        renderPatternPreview(null);
-        highlightSVGColor(null);
-      });
-    }
-
-    if (color.fabric) {
-      swatch.innerHTML = `
-        <div class="color-box" style="background-color: ${color.fabric.hex}"></div>
-        <div class="color-info">
-          <div class="fabric-name-row">
-            <div class="fabric-name">${color.fabric.name}</div>
-            ${color.isBackground ? '<span class="swatch-role-badge">Background</span>' : ''}
-          </div>
-          <div class="fabric-details">
-            <span class="fabric-number">${color.fabric.number}</span>
-            <span class="fabric-sep">·</span>
-            <span class="color-percent">${color.percentage}%</span>
-            ${color.isBackground ? '' : `<span class="fabric-sep">·</span><span class="color-pieces">${formatPieceCount(color.pieceCount)}</span>`}
-          </div>
-          <div class="fabric-match-bar">
-            <span class="match-swatch" style="background-color: ${color.hex}" title="Image color ${color.hex}"></span>
-            <span class="match-arrow">→</span>
-            <span class="match-swatch" style="background-color: ${color.fabric.hex}" title="Kona ${color.fabric.name} ${color.fabric.hex}"></span>
-            <span class="match-delta" title="Color difference (lower = closer match)">Δ${color.fabric.distance}</span>
-          </div>
-        </div>
-      `;
-    } else {
-      swatch.innerHTML = `
-        <div class="color-box" style="background-color: ${color.hex}"></div>
-        <div class="color-info">
-          <div class="fabric-name-row">
-            <div class="color-hex">${color.hex}</div>
-            ${color.isBackground ? '<span class="swatch-role-badge">Background</span>' : ''}
-          </div>
-          <div class="color-percent">${color.isBackground ? `${color.percentage}%` : `${color.percentage}% · ${formatPieceCount(color.pieceCount)}`}</div>
-        </div>
-      `;
-    }
-
-    container.appendChild(swatch);
-  }
-}
-
-function formatPieceCount(pieceCount) {
-  return `${pieceCount} ${pieceCount === 1 ? 'piece' : 'pieces'}`;
-}
+// --- Preview / highlight ---
 
 function renderPatternPreview(activeColorIndex) {
   if (!currentPatternRender) return;
@@ -897,43 +330,36 @@ function renderPatternPreview(activeColorIndex) {
   const selectedCtx = selectedLayer.getContext('2d');
   selectedCtx.imageSmoothingEnabled = true;
   selectedCtx.drawImage(processedCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
-
-  const maskCanvas = getSelectedMaskCanvas(activeColorIndex);
+  const maskCanvas = _getMaskCanvas(activeColorIndex);
   selectedCtx.globalCompositeOperation = 'destination-in';
   selectedCtx.imageSmoothingEnabled = false;
   selectedCtx.drawImage(maskCanvas, 0, 0, processingW, processingH, 0, 0, displayW, displayH);
   selectedCtx.globalCompositeOperation = 'source-over';
-
   patternCtx.drawImage(selectedLayer, 0, 0);
 }
 
-function getSelectedMaskCanvas(colorIndex) {
+function _getMaskCanvas(colorIndex) {
   if (currentPatternRender.maskCache.has(colorIndex)) {
     return currentPatternRender.maskCache.get(colorIndex);
   }
 
   const { assignments, processingW, processingH } = currentPatternRender;
   const maskData = new Uint8ClampedArray(assignments.length * 4);
-
   for (let i = 0; i < assignments.length; i++) {
     if (assignments[i] !== colorIndex) continue;
     const off = i * 4;
-    maskData[off] = 255;
-    maskData[off + 1] = 255;
-    maskData[off + 2] = 255;
-    maskData[off + 3] = 255;
+    maskData[off] = maskData[off + 1] = maskData[off + 2] = maskData[off + 3] = 255;
   }
 
   const maskCanvas = document.createElement('canvas');
   maskCanvas.width = processingW;
   maskCanvas.height = processingH;
   maskCanvas.getContext('2d').putImageData(new ImageData(maskData, processingW, processingH), 0, 0);
-
   currentPatternRender.maskCache.set(colorIndex, maskCanvas);
   return maskCanvas;
 }
 
-function highlightSVGColor(activeColorIndex) {
+function _highlightSVGColor(activeColorIndex) {
   const container = document.getElementById('svgContainer');
   if (!container) return;
 
@@ -951,55 +377,19 @@ function highlightSVGColor(activeColorIndex) {
   }
 }
 
-// --- Panel Layout (sidebar + hero) ---
-let currentHeroPanel = 'pattern';
-
-function setupPanelLayout() {
-  const panels = canvasContainer.querySelectorAll('.canvas-wrapper[data-panel]');
-  for (const panel of panels) {
-    panel.addEventListener('click', () => {
-      promoteToHero(panel.dataset.panel);
-    });
-  }
-  promoteToHero(currentHeroPanel);
-}
-
-function promoteToHero(panelName) {
-  currentHeroPanel = panelName;
-  const sidebar = document.getElementById('panelSidebar');
-  const hero = document.getElementById('panelHero');
-  const panels = Array.from(canvasContainer.querySelectorAll('.canvas-wrapper[data-panel]'));
-
-  // Sort non-hero panels by their original order
-  const sidebarPanels = panels
-    .filter(p => p.dataset.panel !== panelName)
-    .sort((a, b) => +a.dataset.order - +b.dataset.order);
-
-  const heroPanel = panels.find(p => p.dataset.panel === panelName);
-
-  // Move panels into their containers
-  sidebar.replaceChildren(...sidebarPanels);
-  hero.replaceChildren(heroPanel);
-}
-
 // --- Buttons ---
-function setupButtons() {
-  resetCropBtn.addEventListener('click', () => {
-    if (cropTool) cropTool.resetCrop();
-  });
-
-  applyCropBtn.addEventListener('click', applyCrop);
+function _setupButtons() {
+  document.getElementById('resetCropBtn').addEventListener('click', () => cropTool?.resetCrop());
+  document.getElementById('applyCropBtn').addEventListener('click', applyCrop);
   recropBtn.addEventListener('click', () => showCropStep());
-
   downloadBtn.addEventListener('click', () => {
-    const quiltWidthInches = parseInt(quiltWidth.value, 10);
+    const { quiltWidth } = getControlValues();
     const quiltHeightInches = currentCrop
-      ? Math.round(quiltWidthInches * (currentCrop.h / currentCrop.w))
+      ? Math.round(quiltWidth * (currentCrop.h / currentCrop.w))
       : null;
-
     exportPdf(document.getElementById('svgContainer'), currentPalette, {
       svgMarkup: currentPatternSvgMarkup,
-      quiltWidthInches,
+      quiltWidthInches: quiltWidth,
       quiltHeightInches,
     });
   });
