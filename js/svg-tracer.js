@@ -266,8 +266,8 @@ function polygonToSVGPath(pts) {
  * Convert points to a smooth closed SVG path.
  *
  * smoothness 0:   straight polygon, no changes.
- * smoothness 50:  moderate Taubin rounding + gentle bezier curves.
- * smoothness 100: maximum Taubin (22 iterations) + full Catmull-Rom tension.
+ * smoothness 50:  moderate Taubin rounding + visible bezier softening.
+ * smoothness 100: high Taubin rounding + strong Catmull-Rom tension.
  *                 A square becomes circle-like.
  */
 function smoothToSVGPath(pts, smoothness = 60) {
@@ -279,12 +279,15 @@ function smoothToSVGPath(pts, smoothness = 60) {
     return polygonToSVGPath(pts);
   }
 
-  // Taubin iterations: quadratic ramp so high end is strongly rounded.
-  const iterations = Math.round(t * t * 22);
+  // Stronger slider response: ease lightly so mid-range is still noticeable.
+  const eased = t ** 1.2;
+
+  // Taubin iterations: larger cap gives materially stronger high-end rounding.
+  const iterations = Math.round(eased * 60);
   const smoothed = iterations > 0 ? taubinSmooth(pts, iterations) : pts;
 
-  // Catmull-Rom tension: 0 (straight) → 1/6 (standard full tension).
-  const tension = t / 6;
+  // Catmull-Rom tension: broaden range so smoothness visibly affects curvature.
+  const tension = 0.02 + eased * 0.28;
 
   const f = (v) => +v.toFixed(2);
   const m = smoothed.length;
