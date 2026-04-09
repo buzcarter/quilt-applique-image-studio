@@ -24,6 +24,7 @@ export function generatePatternSVG(assignments, width, height, palette, options 
   } = resolvedOptions;
   const allPaths = [];
   const pieceCounts = new Map();
+  const _pathLog = [];
   const backgroundEntry = palette.find((color) => color.colorIndex === backgroundColorIndex) || null;
   const backgroundFill = backgroundEntry ? backgroundEntry.hex : '#fff';
   const simplifyTolerance = getSimplifyTolerance(curveComplexity);
@@ -40,12 +41,9 @@ export function generatePatternSVG(assignments, width, height, palette, options 
       if (contour.length < 4) continue;
       const simplified = simplifyClosedPath(contour, simplifyTolerance);
       if (simplified.length < 3) continue;
-      const pathIndex = allPaths.length;
       const perimeterPx = _polylineLength(simplified);
-      console.log(
-        `path[${pathIndex}]  color=${color.hex}  pts=${simplified.length}  perimeter=${perimeterPx.toFixed(1)}px`
-      );
-      count++;
+      _pathLog.push({ index: allPaths.length, color: color.hex, pts: simplified.length, perimeter: perimeterPx });
+      count++
       allPaths.push({
         d: smoothToSVGPath(simplified, smoothness),
         fill: color.hex,
@@ -67,6 +65,12 @@ export function generatePatternSVG(assignments, width, height, palette, options 
   }
 
   lines.push('</svg>');
+
+  _pathLog.sort((a, b) => a.perimeter - b.perimeter);
+  for (const e of _pathLog) {
+    console.log(`path[${e.index}]  color=${e.color}  pts=${e.pts}  perimeter=${e.perimeter.toFixed(1)}px`);
+  }
+
   return { svg: lines.join('\n'), pieceCounts, totalPieces: allPaths.length };
 }
 
