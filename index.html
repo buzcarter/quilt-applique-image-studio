@@ -171,6 +171,20 @@
         <!-- Step 5: Palette -->
         <div id="palette" class="palette hidden">
             <h3>Fabrics: Kona Solids, <span id="paletteCount">0</span> colors (<span id="pieceCount">0</span> pieces)</h3>
+            <div id="fabricPickerOverlay" class="fabric-picker hidden" aria-hidden="true">
+                <div class="fabric-picker__backdrop" data-action="close-fabric-picker"></div>
+                <div class="fabric-picker__panel" role="dialog" aria-modal="true" aria-labelledby="fabricPickerTitle">
+                    <div class="fabric-picker__header">
+                        <h4 id="fabricPickerTitle">Choose Kona color</h4>
+                        <button type="button" class="fabric-picker__close" id="fabricPickerCloseBtn" aria-label="Close color picker">×</button>
+                    </div>
+                    <p class="fabric-picker__hint">Pick a fabric to override the mapped Kona color for this swatch.</p>
+                    <div class="fabric-picker__search-row">
+                        <input type="search" id="fabricPickerSearch" class="fabric-picker__search" placeholder="Search by name, number, or hex" aria-label="Search Kona colors">
+                    </div>
+                    <div id="fabricPickerGrid" class="fabric-picker__grid" role="listbox" aria-label="Kona colors"></div>
+                </div>
+            </div>
             <div class="color-swatches" id="colorSwatches"></div>
         </div>
 
@@ -202,6 +216,12 @@
                     <span class="match-arrow">→</span>
                     <span class="match-swatch" style="background-color: {{FABRIC_HEX}}" title="Kona {{FABRIC_NAME}} {{FABRIC_HEX}}"></span>
                     <span class="match-delta" title="Color difference (lower = closer match)">Δ{{DELTA}}</span>
+                </div>
+                <div class="fabric-actions">
+                    <button type="button" class="swatch-change-btn" data-action="change-fabric" data-color-index="{{COLOR_INDEX}}" aria-label="Change Kona color for {{FABRIC_NAME}}">
+                        <img src="images/icons/crayons-draw-colors.svg" alt="" width="14" height="14">
+                        <span>Change</span>
+                    </button>
                 </div>
             </div>
         </div>

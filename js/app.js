@@ -15,7 +15,7 @@
  */
 import { CropTool } from './crop-tool.js';
 import { quantizeColors, mergeSmallRegions } from './image-processing.js';
-import { loadFabricLibrary, matchPaletteToFabrics } from './fabric-matcher.js';
+import { loadFabricLibrary, matchPaletteToFabrics, getFabricLibrary } from './fabric-matcher.js';
 import { generatePatternSVG } from './svg-tracer.js';
 import { exportPdf } from './pdf-export.js';
 import { saveSession, loadSession } from './session.js';
@@ -32,6 +32,8 @@ import {
 } from './paint-tool.js';
 import { renderPalette } from './palette-view.js';
 import { initPanelLayout } from './panel-layout.js';
+import { rgbToLab, deltaE } from './color-science.js';
+import { initFabricPicker, openFabricPicker } from './fabric-picker.js';
 
 // --- App state ---
 let originalImage = null;
@@ -104,6 +106,12 @@ async function init() {
   _setupCropPresets();
   _setupButtons();
   initPanelLayout(canvasContainer);
+  initFabricPicker({
+    getLibrary: () => getFabricLibrary(),
+    onSelect: (colorIndex, fabric) => {
+      _overrideMatchedFabric(colorIndex, fabric);
+    },
+  });
   restoreSession();
 }
 
@@ -330,8 +338,45 @@ function processPattern() {
   renderPalette(currentPalette, currentTotalPieces, {
     onHighlight:   (ci) => { renderPatternPreview(ci); _highlightSVGColor(ci); },
     onUnhighlight: ()   => { renderPatternPreview(null); _highlightSVGColor(null); },
+    onChangeFabric: (ci) => {
+      const entry = currentPalette.find((item) => item.colorIndex === ci);
+      if (!entry) return;
+      openFabricPicker({
+        colorIndex: ci,
+        currentFabric: entry.fabric,
+        sourceLabel: entry.fabric?.name || entry.hex,
+      });
+    },
   });
   refreshPaintColorOptions(currentSimplifiedResult.matchedPalette || currentPalette);
+}
+
+function _overrideMatchedFabric(colorIndex, fabric) {
+  if (!currentSimplifiedResult?.matchedPalette || !fabric) return;
+
+  const sourceEntry = currentSimplifiedResult.palette.find((entry) => entry.colorIndex === colorIndex);
+  if (!sourceEntry?.lab) return;
+
+  const targetLab = rgbToLab(fabric.rgb.r, fabric.rgb.g, fabric.rgb.b);
+  const distance = deltaE(sourceEntry.lab, targetLab).toFixed(1);
+
+  currentSimplifiedResult.matchedPalette = currentSimplifiedResult.matchedPalette.map((entry) => (
+    entry.colorIndex === colorIndex
+      ? {
+          ...entry,
+          fabric: {
+            name: fabric.name,
+            number: fabric.number,
+            hex: fabric.hex,
+            rgb: fabric.rgb,
+            distance,
+          },
+        }
+      : entry
+  ));
+
+  processPattern();
+  persistSession();
 }
 
 // --- Preview / highlight ---
