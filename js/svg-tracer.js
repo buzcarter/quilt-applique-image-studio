@@ -40,6 +40,11 @@ export function generatePatternSVG(assignments, width, height, palette, options 
       if (contour.length < 4) continue;
       const simplified = simplifyClosedPath(contour, simplifyTolerance);
       if (simplified.length < 3) continue;
+      const pathIndex = allPaths.length;
+      const perimeterPx = _polylineLength(simplified);
+      console.log(
+        `path[${pathIndex}]  color=${color.hex}  pts=${simplified.length}  perimeter=${perimeterPx.toFixed(1)}px`
+      );
       count++;
       allPaths.push({
         d: smoothToSVGPath(simplified, smoothness),
@@ -308,4 +313,20 @@ function smoothToSVGPath(pts, smoothness = 60) {
   }
 
   return d + 'Z';
+}
+
+// --- Diagnostics ---
+
+/**
+ * Straight-line perimeter of a closed polygon (treats all segments as linear).
+ * Fast approximation suitable for size filtering; no curve math needed.
+ */
+function _polylineLength(pts) {
+  let len = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    len += Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+  return len;
 }
