@@ -3,33 +3,111 @@
  * Uses svg2pdf.js to embed the SVG as scalable vector paths.
  */
 
-export async function exportPdf(svgContainer, palette) {
+function getCleanExportSvg(svgContainer, svgMarkup) {
+  let svgEl = null;
+
+  if (typeof svgMarkup === 'string' && svgMarkup.trim()) {
+    const parsed = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
+    svgEl = parsed.documentElement;
+  } else {
+    const sourceSvg = svgContainer?.querySelector('svg');
+    svgEl = sourceSvg ? sourceSvg.cloneNode(true) : null;
+  }
+
+  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg') {
+    throw new Error('Pattern SVG was not found. Re-generate the pattern before exporting.');
+  }
+
+  svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  svgEl.classList.remove('pattern-svg');
+
+  for (const path of svgEl.querySelectorAll('path.active')) {
+    path.classList.remove('active');
+  }
+
+  const vb = svgEl.viewBox?.baseVal;
+  if (!vb || vb.width <= 0 || vb.height <= 0) {
+    const widthAttr = parseFloat(svgEl.getAttribute('width') || '0');
+    const heightAttr = parseFloat(svgEl.getAttribute('height') || '0');
+    if (widthAttr > 0 && heightAttr > 0) {
+      svgEl.setAttribute('viewBox', `0 0 ${widthAttr} ${heightAttr}`);
+    } else {
+      throw new Error('Pattern SVG is missing size metadata and cannot be exported.');
+    }
+  }
+
+  return svgEl;
+}
+
+function fitRect(sourceW, sourceH, maxW, maxH) {
+  const scale = Math.min(maxW / sourceW, maxH / sourceH);
+  return {
+    width: sourceW * scale,
+    height: sourceH * scale,
+  };
+}
+
+export async function exportPdf(svgContainer, palette, options = {}) {
+  const {
+    svgMarkup = '',
+    quiltWidthInches = null,
+    quiltHeightInches = null,
+  } = options;
+
   const { jsPDF } = window.jspdf;
+  if (typeof jsPDF !== 'function') {
+    throw new Error('jsPDF is unavailable. Please reload and try again.');
+  }
+
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'letter',
   });
 
+  if (typeof pdf.svg !== 'function') {
+    throw new Error('svg2pdf.js is unavailable. PDF export requires vector SVG support.');
+  }
+
+  const svgEl = getCleanExportSvg(svgContainer, svgMarkup);
+  const vb = svgEl.viewBox.baseVal;
+
+  const margin = 15;
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+
   // Title
   pdf.setFontSize(20);
   pdf.setFont(undefined, 'bold');
-  pdf.text('Appliqué Quilt Pattern', 15, 20);
+  pdf.text('Appliqué Quilt Pattern', margin, 20);
 
-  // Embed SVG as vector paths
-  const svgEl = svgContainer.querySelector('svg');
-  const vb = svgEl.viewBox.baseVal;
-  const imgWidth = 180;
-  const imgHeight = (vb.height / vb.width) * imgWidth;
+  pdf.setFontSize(9);
+  pdf.setFont(undefined, 'normal');
+  pdf.setTextColor(100);
+  const sizeText = (quiltWidthInches && quiltHeightInches)
+    ? `Quilt size: ${quiltWidthInches}" x ${quiltHeightInches}"`
+    : 'Scalable vector pattern';
+  pdf.text(sizeText, margin, 25);
+  pdf.setTextColor(0);
 
-  await pdf.svg(svgEl, { x: 15, y: 30, width: imgWidth, height: imgHeight });
+  const svgBounds = fitRect(vb.width, vb.height, pageW - margin * 2, 120);
+  await pdf.svg(svgEl, {
+    x: margin,
+    y: 30,
+    width: svgBounds.width,
+    height: svgBounds.height,
+  });
 
-  let yPos = 30 + imgHeight + 15;
+  let yPos = 30 + svgBounds.height + 12;
+  if (yPos > pageH - 40) {
+    pdf.addPage();
+    yPos = 20;
+  }
 
   // Fabric list header
   pdf.setFontSize(14);
   pdf.setFont(undefined, 'bold');
-  pdf.text('Fabric Shopping List', 15, yPos);
+  pdf.text('Fabric Shopping List', margin, yPos);
   yPos += 10;
 
   pdf.setFontSize(10);
@@ -38,22 +116,22 @@ export async function exportPdf(svgContainer, palette) {
   for (const color of palette) {
     // Color swatch box
     pdf.setFillColor(color.rgb[0], color.rgb[1], color.rgb[2]);
-    pdf.rect(15, yPos - 4, 8, 8, 'F');
+    pdf.rect(margin, yPos - 4, 8, 8, 'F');
 
     // Fabric info
     const fabricInfo = color.fabric
       ? `${color.fabric.name} (${color.fabric.number})`
       : color.hex;
 
-    pdf.text(`${fabricInfo}  —  ${color.percentage}%`, 28, yPos);
+    pdf.text(`${fabricInfo}  —  ${color.percentage}%`, margin + 13, yPos);
 
     // Show matched fabric swatch next to the quantized color if different
     if (color.fabric) {
       pdf.setFillColor(color.fabric.rgb.r, color.fabric.rgb.g, color.fabric.rgb.b);
-      pdf.rect(15, yPos + 5, 8, 4, 'F');
+      pdf.rect(margin, yPos + 5, 8, 4, 'F');
       pdf.setFontSize(8);
       pdf.setTextColor(100);
-      pdf.text(`Fabric match: ${color.fabric.hex}`, 28, yPos + 8);
+      pdf.text(`Fabric match: ${color.fabric.hex}`, margin + 13, yPos + 8);
       pdf.setFontSize(10);
       pdf.setTextColor(0);
       yPos += 10;
@@ -73,7 +151,7 @@ export async function exportPdf(svgContainer, palette) {
     pdf.setPage(i);
     pdf.setFontSize(8);
     pdf.setTextColor(150);
-    pdf.text(`Generated by Appliqué Studio — Page ${i} of ${pageCount}`, 15, 270);
+    pdf.text(`Generated by Appliqué Studio — Page ${i} of ${pageCount}`, margin, 270);
   }
 
   pdf.save('applique-pattern.pdf');

@@ -28,6 +28,7 @@ let currentCrop = null;
 let currentPalette = [];
 let currentTotalPieces = 0;
 let currentPatternRender = null;
+let currentPatternSvgMarkup = '';
 
 // DOM refs
 const uploadArea = document.getElementById('uploadArea');
@@ -336,6 +337,7 @@ function processImage() {
   const svgResult = generatePatternSVG(
     simplified.assignments, processingW, processingH, simplified.palette
   );
+  currentPatternSvgMarkup = svgResult.svg;
   svgContainer.innerHTML = svgResult.svg;
 
   // Apply SVG-derived piece counts to palette before display
@@ -538,7 +540,16 @@ function setupButtons() {
   recropBtn.addEventListener('click', () => showCropStep());
 
   downloadBtn.addEventListener('click', () => {
-    exportPdf(document.getElementById('svgContainer'), currentPalette);
+    const quiltWidthInches = parseInt(quiltWidth.value, 10);
+    const quiltHeightInches = currentCrop
+      ? Math.round(quiltWidthInches * (currentCrop.h / currentCrop.w))
+      : null;
+
+    exportPdf(document.getElementById('svgContainer'), currentPalette, {
+      svgMarkup: currentPatternSvgMarkup,
+      quiltWidthInches,
+      quiltHeightInches,
+    });
   });
 }
 
