@@ -166,6 +166,28 @@ label {
   gap: 10px;
 }
 
+.slider-step-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #b8c7c2;
+  background: #eef4f1;
+  color: #2c5f4f;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 0;
+}
+
+.slider-step-btn:hover {
+  background: #dce9e3;
+}
+
+.slider-step-btn:focus {
+  outline: 2px solid rgba(44, 95, 79, 0.3);
+  outline-offset: 1px;
+}
+
 .slider-min,
 .slider-max {
   font-size: 11px;

@@ -216,6 +216,28 @@ function setupControls() {
     }, 150);
   };
 
+  const nudgeSlider = (slider, direction) => {
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const step = parseFloat(slider.step || '1');
+    const currentValue = parseFloat(slider.value);
+    const decimalPlaces = (slider.step.split('.')[1] || '').length;
+    const nextValue = Math.min(max, Math.max(min, currentValue + (step * direction)));
+
+    slider.value = nextValue.toFixed(decimalPlaces);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  document.querySelectorAll('.slider-step-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const sliderId = button.dataset.target;
+      const direction = parseInt(button.dataset.direction, 10);
+      const slider = document.getElementById(sliderId);
+      if (!slider || Number.isNaN(direction)) return;
+      nudgeSlider(slider, direction);
+    });
+  });
+
   quiltWidth.addEventListener('input', () => {
     quiltWidthValue.textContent = quiltWidth.value + '"';
     updateQuiltDimensions();

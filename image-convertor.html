@@ -43,7 +43,9 @@
                 <label for="quiltWidth">Quilt Width <span class="value-display" id="quiltWidthValue">36"</span></label>
                 <div class="slider-container">
                     <span class="slider-min">10"</span>
+                    <button type="button" class="slider-step-btn" data-target="quiltWidth" data-direction="-1" aria-label="Decrease quilt width">&lt;</button>
                     <input type="range" id="quiltWidth" min="10" max="80" value="36" step="1">
+                    <button type="button" class="slider-step-btn" data-target="quiltWidth" data-direction="1" aria-label="Increase quilt width">&gt;</button>
                     <span class="slider-max">80"</span>
                 </div>
                 <div class="control-detail" id="quiltDimensions"></div>
@@ -52,8 +54,10 @@
             <div class="control-group">
                 <label for="colorSlider">Number of Fabrics <span class="value-display" id="colorValue">10</span></label>
                 <div class="slider-container">
-                    <span class="slider-min">4</span>
-                    <input type="range" id="colorSlider" min="4" max="30" value="10" step="1">
+                    <span class="slider-min">2</span>
+                    <button type="button" class="slider-step-btn" data-target="colorSlider" data-direction="-1" aria-label="Decrease number of fabrics">&lt;</button>
+                    <input type="range" id="colorSlider" min="2" max="30" value="10" step="1">
+                    <button type="button" class="slider-step-btn" data-target="colorSlider" data-direction="1" aria-label="Increase number of fabrics">&gt;</button>
                     <span class="slider-max">30</span>
                 </div>
             </div>
@@ -62,7 +66,9 @@
                 <label for="minPieceSize">Smallest Piece <span class="value-display" id="minPieceSizeValue">2"</span></label>
                 <div class="slider-container">
                     <span class="slider-min">½"</span>
+                    <button type="button" class="slider-step-btn" data-target="minPieceSize" data-direction="-1" aria-label="Decrease smallest piece">&lt;</button>
                     <input type="range" id="minPieceSize" min="0.5" max="14" value="2" step="0.5">
+                    <button type="button" class="slider-step-btn" data-target="minPieceSize" data-direction="1" aria-label="Increase smallest piece">&gt;</button>
                     <span class="slider-max">14"</span>
                 </div>
                 <div class="control-detail">Smaller pieces keep more contour detail. Larger pieces merge stray fragments into simpler shapes.</div>
