@@ -151,7 +151,9 @@ input[type="file"] {
 }
 
 label {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-bottom: 8px;
   font-weight: 600;
   color: #2c5f4f;
@@ -161,7 +163,23 @@ label {
 .slider-container {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
+}
+
+.slider-min,
+.slider-max {
+  font-size: 11px;
+  color: #aaa;
+  flex-shrink: 0;
+  min-width: 24px;
+}
+
+.slider-min {
+  text-align: right;
+}
+
+.slider-max {
+  text-align: left;
 }
 
 input[type="range"] {

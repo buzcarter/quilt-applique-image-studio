@@ -40,30 +40,30 @@
         <!-- Step 3: Adjust -->
         <div id="controls" class="controls hidden">
             <div class="control-group">
-                <label for="quiltWidth">Quilt Width</label>
+                <label for="quiltWidth">Quilt Width <span class="value-display" id="quiltWidthValue">36"</span></label>
                 <div class="slider-container">
-                    <span>10"</span>
+                    <span class="slider-min">10"</span>
                     <input type="range" id="quiltWidth" min="10" max="80" value="36" step="1">
-                    <span class="value-display" id="quiltWidthValue">36"</span>
+                    <span class="slider-max">80"</span>
                 </div>
                 <div class="control-detail" id="quiltDimensions"></div>
             </div>
 
             <div class="control-group">
-                <label for="colorSlider">Number of Fabrics</label>
+                <label for="colorSlider">Number of Fabrics <span class="value-display" id="colorValue">10</span></label>
                 <div class="slider-container">
-                    <span>4</span>
+                    <span class="slider-min">4</span>
                     <input type="range" id="colorSlider" min="4" max="30" value="10" step="1">
-                    <span class="value-display" id="colorValue">10</span>
+                    <span class="slider-max">30</span>
                 </div>
             </div>
 
             <div class="control-group">
-                <label for="minPieceSize">Smallest Piece</label>
+                <label for="minPieceSize">Smallest Piece <span class="value-display" id="minPieceSizeValue">2"</span></label>
                 <div class="slider-container">
-                    <span>½"</span>
+                    <span class="slider-min">½"</span>
                     <input type="range" id="minPieceSize" min="0.5" max="14" value="2" step="0.5">
-                    <span class="value-display" id="minPieceSizeValue">2"</span>
+                    <span class="slider-max">14"</span>
                 </div>
                 <div class="control-detail">Smaller pieces = more detail, more cutting. Larger = simpler pattern.</div>
             </div>

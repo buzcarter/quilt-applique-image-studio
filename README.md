@@ -13,6 +13,31 @@ Existing tools either require technical skills (Photoshop, Illustrator), have co
 Upload a photo, pick a fabric line, adjust a few sliders, and get a pattern with a fabric shopping list. That's it.
 
 **Target audience:** Non-technical quilt guild members working from iPhone photos.
+## How It Works
+
+Appliqué Studio turns your photo into a quilt pattern in 4 simple steps:
+
+1. **Choose Your Photo** — Upload or capture a photo you love
+2. **Frame Your Design** — Crop the area you want, pick your final size (width in inches)
+3. **Pick Your Complexity** — Adjust how many fabrics and how detailed the shapes should be
+4. **Get Your Pattern** — Preview your design and download a shopping list of real fabrics to order
+
+## The Art of Simplification
+
+Your quilt won't look pixelated or blocky. Instead, it looks like a **stylized map** with flowing, curved seams:
+
+- Colors are simplified to match real Kona Cotton fabrics (you pick how many)
+- Small noise and stray pixels are cleaned up automatically
+- Shapes follow your photo's contours naturally—rounded, curved, with organic edges
+- Tiny details merge into larger shapes for simpler cutting
+
+**Your control:** The "Complexity" slider adjusts how much detail remains. Lower = simpler patterns (faster cutting), Higher = more contoured shapes (more realistic to the original).
+
+## Who This Is For
+
+- Quilters (beginner to experienced) who want to turn beloved photos into appliqué patterns
+- Non-technical makers—no design or software skills needed
+- Anyone who wants to skip the manual tracing and get straight to cutting fabric
 
 ## Design Philosophy
 
