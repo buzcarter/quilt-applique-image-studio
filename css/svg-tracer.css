@@ -1,10 +1,10 @@
 /* SVG pattern panel */
 #svgContainer {
-  max-width: 100%;
+  width: 100%;
 }
 
 #svgContainer .pattern-svg {
-  max-width: 100%;
+  width: 100%;
   height: auto;
   border: 1px solid #ddd;
   border-radius: 4px;

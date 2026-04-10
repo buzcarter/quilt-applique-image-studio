@@ -257,9 +257,10 @@ async function processQuantization() {
   const aspectRatio = currentCrop.h / currentCrop.w;
   const processingH = Math.max(4, Math.round(processingW * aspectRatio));
 
-  const displayScale = Math.min(400 / currentCrop.w, 1);
-  const displayW = Math.floor(currentCrop.w * displayScale);
-  const displayH = Math.floor(currentCrop.h * displayScale);
+  // Cap display canvas at 1920×1080; never upscale beyond the crop's native pixels.
+  const displayScale = Math.min(1920 / currentCrop.w, 1080 / currentCrop.h, 1);
+  const displayW = Math.max(1, Math.floor(currentCrop.w * displayScale));
+  const displayH = Math.max(1, Math.floor(currentCrop.h * displayScale));
 
   originalCanvas.width = displayW;
   originalCanvas.height = displayH;
