@@ -16,13 +16,19 @@
 .panel-hero {
   display: flex;
   align-items: flex-start;
-  max-height: 500px;
+  /* max-height: 75vh; */
+}
+
+.panel-hero .canvas-stack {
+  display: block;
+  width: 100%;
 }
 
 .panel-hero canvas,
 .panel-hero .pattern-svg {
-  max-height: 450px;
-  width: auto;
+  width: 100%;
+  height: auto;
+  /* max-height: 75vh; */
 }
 
 .canvas-wrapper {

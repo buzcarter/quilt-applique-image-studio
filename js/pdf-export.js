@@ -120,7 +120,25 @@ export async function exportPdf(svgContainer, palette, options = {}) {
     height: svgBounds.height,
   });
 
-  // Page 2+: Kona fabric grid.
+  // Page 2: line-art SVG (no fill, 1px stroke on all paths).
+  pdf.addPage();
+  const lineSvg = svgEl.cloneNode(true);
+  for (const rect of lineSvg.querySelectorAll('rect')) {
+    rect.setAttribute('fill', 'none');
+  }
+  for (const path of lineSvg.querySelectorAll('path')) {
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#000000');
+    path.setAttribute('stroke-width', '1');
+  }
+  await pdf.svg(lineSvg, {
+    x: svgX,
+    y: svgY,
+    width: svgBounds.width,
+    height: svgBounds.height,
+  });
+
+  // Page 3+: Kona fabric grid.
   pdf.addPage();
   const fabrics = collectUsedFabrics(palette);
   const colorCount = fabrics.length;

@@ -257,9 +257,10 @@ async function processQuantization() {
   const aspectRatio = currentCrop.h / currentCrop.w;
   const processingH = Math.max(4, Math.round(processingW * aspectRatio));
 
-  const displayScale = Math.min(400 / currentCrop.w, 1);
-  const displayW = Math.floor(currentCrop.w * displayScale);
-  const displayH = Math.floor(currentCrop.h * displayScale);
+  // Cap display canvas at 1920×1080; never upscale beyond the crop's native pixels.
+  const displayScale = Math.min(1920 / currentCrop.w, 1080 / currentCrop.h, 1);
+  const displayW = Math.max(1, Math.floor(currentCrop.w * displayScale));
+  const displayH = Math.max(1, Math.floor(currentCrop.h * displayScale));
 
   originalCanvas.width = displayW;
   originalCanvas.height = displayH;
@@ -289,7 +290,7 @@ async function processQuantization() {
   const matchedPalette = matchPaletteToFabrics(simplified.palette);
   const backgroundColorIndex = _chooseBackgroundColorIndex(matchedPalette);
 
-  currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, palette: simplified.palette, matchedPalette, backgroundColorIndex };
+  currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, pxPerInch, palette: simplified.palette, matchedPalette, backgroundColorIndex };
 
   if (pendingPaintOverlayDataUrl) {
     await restorePaintOverlayFromDataUrl(pendingPaintOverlayDataUrl);
@@ -306,9 +307,9 @@ async function processQuantization() {
 function processPattern() {
   if (!currentSimplifiedResult) return;
 
-  const { assignments, processingW, processingH, palette, matchedPalette } =
+  const { assignments, processingW, processingH, pxPerInch, palette, matchedPalette } =
     currentSimplifiedResult;
-  const { curveComplexity, smoothness } = getControlValues();
+  const { curveComplexity, smoothness, minPieceSize } = getControlValues();
 
   const mergedSource = getMergedAssignments(assignments, processingW, processingH);
   const { updatedPalette, updatedMatchedPalette } = _buildPaletteFromAssignments(
@@ -332,7 +333,7 @@ function processPattern() {
     processingW,
     processingH,
     svgPalette,
-    { backgroundColorIndex, curveComplexity, smoothness }
+    { backgroundColorIndex, curveComplexity, smoothness, minPieceSize, pxPerInch }
   );
   currentPatternSvgMarkup = svgResult.svg;
   document.getElementById('svgContainer').innerHTML = svgResult.svg;
