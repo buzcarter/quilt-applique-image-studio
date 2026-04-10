@@ -23,11 +23,17 @@ export function generatePatternSVG(assignments, width, height, palette, options 
     backgroundColorIndex = null,
     curveComplexity = 55,
     smoothness = 60,
+    minPieceSize = 0,
+    pxPerInch = 0,
   } = resolvedOptions;
 
   const cornerThreshold = _getCornerThreshold(curveComplexity);
   const fitTolerance = _getFitTolerance(smoothness);
-  const minArea = config.svg.min_area;
+  // Area threshold in sq processing-pixels, derived from the physical min piece size.
+  // Falls back to config default when pxPerInch is unavailable.
+  const minArea = pxPerInch > 0
+    ? Math.max(config.svg.min_area, (minPieceSize * pxPerInch) ** 2)
+    : config.svg.min_area;
 
   const allPaths = [];
   const pieceCounts = new Map();
@@ -80,20 +86,22 @@ function _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
 /**
  * Map complexity slider (0–100) to corner detection angle threshold (radians).
- * Low complexity → high threshold → fewer corners → simpler shapes.
+ * Low complexity → high threshold (2.5 rad ≈ 143°) → only sharp turns kept.
+ * High complexity → low threshold (0.15 rad ≈ 9°) → gentle bends become corners.
  */
 function _getCornerThreshold(curveComplexity) {
   const t = _clamp01(Number(curveComplexity || 0) / 100);
-  return 0.2 + (1 - t) ** 1.5 * 1.6;
+  return 0.15 + (1 - t) ** 1.5 * 2.35;
 }
 
 /**
  * Map smoothness slider (0–100) to bezier fitting tolerance (pixels).
- * High smoothness → high tolerance → smoother curves.
+ * Low smoothness → 0.5px tolerance → curves hug every bump.
+ * High smoothness → 20px tolerance → flowing lines for scissors.
  */
 function _getFitTolerance(smoothness) {
   const t = _clamp01(Number(smoothness || 0) / 100);
-  return 0.5 + t ** 1.3 * 7.5;
+  return 0.5 + t ** 1.3 * 19.5;
 }
 
 // --- Marching Squares Contour Tracing ---

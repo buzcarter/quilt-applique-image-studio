@@ -1,7 +1,8 @@
 // Shared app configuration values.
 export const config = {
   svg: {
-    // Contours enclosing fewer than this many square processing-pixels are discarded.
-    min_area: 30,
+    // Safety-net floor: contours below this area (sq processing-pixels) are always
+    // discarded. The real threshold comes from minPieceSize × pxPerInch at runtime.
+    min_area: 100,
   },
 };

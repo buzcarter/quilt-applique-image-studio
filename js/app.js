@@ -289,7 +289,7 @@ async function processQuantization() {
   const matchedPalette = matchPaletteToFabrics(simplified.palette);
   const backgroundColorIndex = _chooseBackgroundColorIndex(matchedPalette);
 
-  currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, palette: simplified.palette, matchedPalette, backgroundColorIndex };
+  currentSimplifiedResult = { assignments: simplified.assignments, processingW, processingH, pxPerInch, palette: simplified.palette, matchedPalette, backgroundColorIndex };
 
   if (pendingPaintOverlayDataUrl) {
     await restorePaintOverlayFromDataUrl(pendingPaintOverlayDataUrl);
@@ -306,9 +306,9 @@ async function processQuantization() {
 function processPattern() {
   if (!currentSimplifiedResult) return;
 
-  const { assignments, processingW, processingH, palette, matchedPalette } =
+  const { assignments, processingW, processingH, pxPerInch, palette, matchedPalette } =
     currentSimplifiedResult;
-  const { curveComplexity, smoothness } = getControlValues();
+  const { curveComplexity, smoothness, minPieceSize } = getControlValues();
 
   const mergedSource = getMergedAssignments(assignments, processingW, processingH);
   const { updatedPalette, updatedMatchedPalette } = _buildPaletteFromAssignments(
@@ -332,7 +332,7 @@ function processPattern() {
     processingW,
     processingH,
     svgPalette,
-    { backgroundColorIndex, curveComplexity, smoothness }
+    { backgroundColorIndex, curveComplexity, smoothness, minPieceSize, pxPerInch }
   );
   currentPatternSvgMarkup = svgResult.svg;
   document.getElementById('svgContainer').innerHTML = svgResult.svg;
