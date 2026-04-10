@@ -2,9 +2,20 @@
  * SVG contour tracer for quilting patterns.
  * Converts pixel-based color assignments into smooth SVG paths
  * using marching squares contour tracing and Schneider bezier curve fitting.
+ *
+ * Each color produces a single compound <path> with evenodd fill rule.
+ * Hole contours (inner boundaries) are included in the compound path so
+ * the fill rule cuts them out; only outer contours count toward piece totals.
  */
 import { config } from './config.js';
-import { presmoothContour, polygonArea, detectCorners, fitContourPath } from './bezier-fit.js';
+import {
+  presmoothContour,
+  subsampleByArcLength,
+  polygonArea,
+  boundingBox,
+  detectCorners,
+  fitContourPath,
+} from './bezier-fit.js';
 
 /**
  * Generate SVG markup from quantized color assignments.
@@ -27,14 +38,26 @@ export function generatePatternSVG(assignments, width, height, palette, options 
     pxPerInch = 0,
   } = resolvedOptions;
 
+  // --- Slider-derived processing parameters ---
+  const smoothT = _clamp01(Number(smoothness || 0) / 100);
+
   const cornerThreshold = _getCornerThreshold(curveComplexity);
   const fitTolerance = _getFitTolerance(smoothness);
-  // Area threshold in sq processing-pixels, derived from the physical min piece size.
-  // Falls back to config default when pxPerInch is unavailable.
+
+  // Presmooth: heavier at higher smoothness
+  const presmoothPasses = 1 + Math.round(smoothT * 2);       // 1–3
+  const presmoothWindow = 5 + Math.round(smoothT * 20);      // 5–25
+
+  // Subsample: sparser at higher smoothness → fewer points for fitter
+  const subsampleSpacing = 3 + smoothT * 9;                   // 3–12 px
+
+  // --- Area & dimension thresholds from physical piece size ---
   const minArea = pxPerInch > 0
     ? Math.max(config.svg.min_area, (minPieceSize * pxPerInch) ** 2)
     : config.svg.min_area;
+  const minDim = pxPerInch > 0 ? minPieceSize * pxPerInch * 0.4 : 0;
 
+  // --- Per-color contour processing ---
   const allPaths = [];
   const pieceCounts = new Map();
   const backgroundEntry = palette.find(c => c.colorIndex === backgroundColorIndex) || null;
@@ -47,37 +70,79 @@ export function generatePatternSVG(assignments, width, height, palette, options 
     }
 
     const contours = traceColorBoundary(assignments, width, height, color.colorIndex);
-    let count = 0;
+    if (!contours.length) {
+      pieceCounts.set(color.colorIndex, 0);
+      continue;
+    }
 
-    for (const contour of contours) {
+    // Determine which winding sign corresponds to outer boundaries.
+    // The largest contour (by absolute area) is always an outer boundary.
+    const areas = contours.map(c => polygonArea(c));
+    let outerSign = -1, maxAbsArea = 0;
+    for (const a of areas) {
+      if (Math.abs(a) > maxAbsArea) {
+        maxAbsArea = Math.abs(a);
+        outerSign = Math.sign(a) || -1;
+      }
+    }
+
+    const fittedSubpaths = [];
+    let pieceCount = 0;
+
+    for (let ci = 0; ci < contours.length; ci++) {
+      const contour = contours[ci];
       if (contour.length < 4) continue;
 
-      const area = Math.abs(polygonArea(contour));
-      if (area < minArea) continue;
+      const absArea = Math.abs(areas[ci]);
+      if (absArea < minArea) continue;
 
-      const smoothed = presmoothContour(contour);
-      const corners = detectCorners(smoothed, cornerThreshold);
-      const pathD = fitContourPath(smoothed, corners, fitTolerance);
+      const isOuter = Math.sign(areas[ci]) === outerSign;
+
+      // Bounding-box narrow-dimension filter (outer contours only —
+      // catches thin slivers that pass the area threshold).
+      if (isOuter && minDim > 0) {
+        const bb = boundingBox(contour);
+        if (Math.min(bb.w, bb.h) < minDim) continue;
+      }
+
+      // Smooth → subsample → corner detect → bezier fit
+      const smoothed = presmoothContour(contour, presmoothWindow, presmoothPasses);
+      const sampled = subsampleByArcLength(smoothed, subsampleSpacing);
+      const corners = detectCorners(sampled, cornerThreshold);
+      const pathD = fitContourPath(sampled, corners, fitTolerance);
       if (!pathD) continue;
 
-      count++;
-      allPaths.push({ d: pathD, fill: color.hex, colorIndex: color.colorIndex });
+      fittedSubpaths.push(pathD);
+      if (isOuter) pieceCount++;
     }
-    pieceCounts.set(color.colorIndex, count);
+
+    pieceCounts.set(color.colorIndex, pieceCount);
+
+    if (fittedSubpaths.length) {
+      // Combine all sub-paths (outer + holes) into one compound <path>.
+      // The evenodd fill rule cuts holes automatically.
+      allPaths.push({
+        d: fittedSubpaths.join(' '),
+        fill: color.hex,
+        colorIndex: color.colorIndex,
+      });
+    }
   }
 
+  // --- Assemble SVG ---
   const lines = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 ${width} ${height}" class="pattern-svg">`,
     `<rect x="-0.5" y="-0.5" width="${width}" height="${height}" fill="${backgroundFill}"/>`,
   ];
   for (const p of allPaths) {
     lines.push(
-      `<path d="${p.d}" fill="${p.fill}" data-color-index="${p.colorIndex}"/>`
+      `<path d="${p.d}" fill="${p.fill}" fill-rule="evenodd" data-color-index="${p.colorIndex}"/>`
     );
   }
   lines.push('</svg>');
 
-  return { svg: lines.join('\n'), pieceCounts, totalPieces: allPaths.length };
+  const totalPieces = [...pieceCounts.values()].reduce((a, b) => a + b, 0);
+  return { svg: lines.join('\n'), pieceCounts, totalPieces };
 }
 
 // --- Slider Mappings ---
@@ -86,8 +151,8 @@ function _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
 /**
  * Map complexity slider (0–100) to corner detection angle threshold (radians).
- * Low complexity → high threshold (2.5 rad ≈ 143°) → only sharp turns kept.
- * High complexity → low threshold (0.15 rad ≈ 9°) → gentle bends become corners.
+ * Low complexity → high threshold (≈143°) → only sharp turns kept.
+ * High complexity → low threshold (≈9°) → gentle bends become corners.
  */
 function _getCornerThreshold(curveComplexity) {
   const t = _clamp01(Number(curveComplexity || 0) / 100);
@@ -96,8 +161,8 @@ function _getCornerThreshold(curveComplexity) {
 
 /**
  * Map smoothness slider (0–100) to bezier fitting tolerance (pixels).
- * Low smoothness → 0.5px tolerance → curves hug every bump.
- * High smoothness → 20px tolerance → flowing lines for scissors.
+ * Low smoothness → 0.5 px → curves hug every bump.
+ * High smoothness → 20 px → flowing lines for scissors.
  */
 function _getFitTolerance(smoothness) {
   const t = _clamp01(Number(smoothness || 0) / 100);
@@ -140,7 +205,6 @@ function traceColorBoundary(assignments, w, h, target) {
   const val = (x, y) =>
     (x >= 0 && x < w && y >= 0 && y < h && assignments[y * w + x] === target) ? 1 : 0;
 
-  // Build adjacency map from marching squares segments
   const adj = new Map();
 
   function addSeg(a, b) {
@@ -164,7 +228,6 @@ function traceColorBoundary(assignments, w, h, target) {
     }
   }
 
-  // Chain segments into closed paths
   const visited = new Set();
   const paths = [];
 

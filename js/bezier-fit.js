@@ -7,21 +7,69 @@
 // --- Contour Pre-processing ---
 
 /**
- * Box-filter smoothing removes pixel staircase from marching squares.
- * Wraps around for closed contours.
+ * Multi-pass box-filter smoothing removes pixel staircase noise.
+ * Multiple passes approximate Gaussian smoothing (central limit theorem).
+ * @param {Array} pts - contour points
+ * @param {number} windowSize - filter width (forced odd, capped to contour length)
+ * @param {number} passes - number of smoothing passes (1–3 typical)
  */
-export function presmoothContour(pts, windowSize = 5) {
+export function presmoothContour(pts, windowSize = 5, passes = 1) {
   const n = pts.length;
-  if (n <= windowSize) return pts.slice();
-  const hw = Math.floor(windowSize / 2);
-  return pts.map((_, i) => {
-    let sx = 0, sy = 0;
-    for (let j = -hw; j <= hw; j++) {
-      const p = pts[(i + j + n) % n];
-      sx += p[0]; sy += p[1];
+  if (n < 4) return pts.slice();
+  let w = windowSize | 1; // force odd
+  w = Math.min(w, (Math.floor(n / 2) * 2) - 1); // cap at contour half-length
+  if (w < 3) w = 3;
+  const hw = Math.floor(w / 2);
+
+  let current = pts;
+  for (let pass = 0; pass < passes; pass++) {
+    const prev = current;
+    current = new Array(n);
+    for (let i = 0; i < n; i++) {
+      let sx = 0, sy = 0;
+      for (let j = -hw; j <= hw; j++) {
+        const p = prev[(i + j + n) % n];
+        sx += p[0]; sy += p[1];
+      }
+      current[i] = [sx / w, sy / w];
     }
-    return [sx / windowSize, sy / windowSize];
-  });
+  }
+  return current;
+}
+
+/**
+ * Resample a closed contour at uniform arc-length intervals.
+ * Reduces point density for cleaner bezier fitting.
+ */
+export function subsampleByArcLength(pts, spacing) {
+  const n = pts.length;
+  if (n <= 4 || spacing <= 0) return pts.slice();
+
+  const arcLen = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    arcLen[i] = arcLen[i - 1] + Math.hypot(
+      pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  }
+  const totalLen = arcLen[n - 1];
+  if (totalLen < spacing * 3) return pts.slice();
+
+  const numSamples = Math.max(6, Math.round(totalLen / spacing));
+  const step = totalLen / numSamples;
+  const result = [pts[0]];
+  let segIdx = 1;
+
+  for (let s = 1; s < numSamples; s++) {
+    const target = s * step;
+    while (segIdx < n - 1 && arcLen[segIdx] < target) segIdx++;
+    const prevLen = arcLen[segIdx - 1];
+    const segLen = arcLen[segIdx] - prevLen;
+    const t = segLen > 1e-9 ? (target - prevLen) / segLen : 0;
+    result.push([
+      pts[segIdx - 1][0] + t * (pts[segIdx][0] - pts[segIdx - 1][0]),
+      pts[segIdx - 1][1] + t * (pts[segIdx][1] - pts[segIdx - 1][1]),
+    ]);
+  }
+  return result;
 }
 
 /** Signed polygon area via shoelace formula. */
@@ -34,6 +82,18 @@ export function polygonArea(pts) {
   return area / 2;
 }
 
+/** Axis-aligned bounding box. */
+export function boundingBox(pts) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
 // --- Corner Detection ---
 
 /**
@@ -44,7 +104,7 @@ export function polygonArea(pts) {
 export function detectCorners(pts, angleThreshold) {
   const n = pts.length;
   if (n < 6) return [];
-  const w = Math.max(3, Math.min(20, Math.round(n * 0.05)));
+  const w = Math.max(2, Math.min(Math.round(n * 0.08), 25));
 
   const angles = new Float64Array(n);
   for (let i = 0; i < n; i++) {
@@ -54,7 +114,6 @@ export function detectCorners(pts, angleThreshold) {
     angles[i] = Math.abs(Math.atan2(dx1 * dy2 - dy1 * dx2, dx1 * dx2 + dy1 * dy2));
   }
 
-  // Collect candidates above threshold, then non-maximum suppress
   const candidates = [];
   for (let i = 0; i < n; i++) {
     if (angles[i] >= angleThreshold) candidates.push({ idx: i, angle: angles[i] });
@@ -78,7 +137,7 @@ export function detectCorners(pts, angleThreshold) {
 /** Find vertex with sharpest turn (fallback split point when no corners detected). */
 function _findSharpestTurn(pts) {
   const n = pts.length;
-  const w = Math.max(3, Math.min(15, Math.round(n * 0.05)));
+  const w = Math.max(2, Math.min(Math.round(n * 0.08), 15));
   let best = -1, bestIdx = 0;
   for (let i = 0; i < n; i++) {
     const prev = pts[(i - w + n) % n], curr = pts[i], next = pts[(i + w) % n];
@@ -133,7 +192,7 @@ function _extractSegment(pts, start, end) {
   return result;
 }
 
-/** Tangent direction at start (isStart=true) or end of a point segment. */
+/** Tangent direction at start or end of a point segment. */
 function _tangent(pts, isStart) {
   const n = pts.length;
   const reach = Math.min(n - 1, 3);
@@ -148,6 +207,8 @@ function _tangent(pts, isStart) {
 }
 
 // --- Schneider's Cubic Bezier Fitting ---
+
+const MAX_FIT_DEPTH = 4;
 
 /**
  * Recursively fit cubic bezier curve(s) to a point sequence.
@@ -172,8 +233,7 @@ function _fitCubic(pts, leftTan, rightTan, tolerance, depth = 0) {
   let [maxErr, splitIdx] = _maxError(pts, bez, u);
   if (maxErr < tolSq) return [bez];
 
-  // Newton-Raphson reparameterization (try when error is within 4× tolerance)
-  if (maxErr < tolSq * 16 && depth < 8) {
+  if (maxErr < tolSq * 16 && depth < MAX_FIT_DEPTH) {
     for (let iter = 0; iter < 4; iter++) {
       u = _reParam(pts, bez, u);
       bez = _solveBezier(pts, u, leftTan, rightTan);
@@ -182,7 +242,7 @@ function _fitCubic(pts, leftTan, rightTan, tolerance, depth = 0) {
     }
   }
 
-  if (depth >= 10) return [bez]; // max recursion fallback
+  if (depth >= MAX_FIT_DEPTH || n <= 3) return [bez];
 
   const cTan = _centerTan(pts, splitIdx);
   return [
@@ -191,7 +251,7 @@ function _fitCubic(pts, leftTan, rightTan, tolerance, depth = 0) {
   ];
 }
 
-/** Chord-length parameterization: t values proportional to cumulative arc length. */
+/** Chord-length parameterization. */
 function _chordParams(pts) {
   const n = pts.length;
   const u = new Float64Array(n);
@@ -202,10 +262,7 @@ function _chordParams(pts) {
   return u;
 }
 
-/**
- * Least-squares solve for a single cubic bezier through parameterized points.
- * Solves for alpha1, alpha2 such that P1 = P0 + alpha1*tHat1, P2 = P3 + alpha2*tHat2.
- */
+/** Least-squares solve for a single cubic bezier. */
 function _solveBezier(pts, u, tHat1, tHat2) {
   const n = pts.length, P0 = pts[0], P3 = pts[n - 1];
   let c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0;
@@ -245,7 +302,7 @@ function _solveBezier(pts, u, tHat1, tHat2) {
   ];
 }
 
-/** Max squared error between data points and fitted bezier. Returns [maxSqDist, index]. */
+/** Max squared error between data points and fitted bezier. */
 function _maxError(pts, bez, u) {
   let maxD = 0, idx = Math.floor(pts.length / 2);
   for (let i = 1; i < pts.length - 1; i++) {
@@ -256,7 +313,7 @@ function _maxError(pts, bez, u) {
   return [maxD, idx];
 }
 
-/** Newton-Raphson: adjust t values to reduce fitting error. */
+/** Newton-Raphson reparameterization. */
 function _reParam(pts, bez, u) {
   const [P0, P1, P2, P3] = bez;
   return Float64Array.from(u, (t, i) => {
